@@ -1,0 +1,135 @@
+---
+description: "Tổng quan dự án, công nghệ, kiến trúc và cấu trúc thư mục"
+globs:
+alwaysApply: true
+---
+# LISA-VISA-WEB Core System
+
+## Project Overview
+Dự án web hỗ trợ tư vấn visa được xây dựng với Next.js 16 và React 19, hỗ trợ đa ngôn ngữ (Tiếng Việt và Tiếng Anh) với giao diện chat thông minh.
+
+## Core Architecture Stack
+- **Frontend**: Next.js 16 + React 19 + TypeScript 5
+- **Styling**: TailwindCSS 4 + shadcn/ui + Radix UI + Ant Design
+- **State Management**: Zustand 5 + TanStack Query 5
+- **API Client**: Axios với custom interceptors + JWT refresh
+- **Internationalization**: i18next + react-i18next (Vietnamese/English)
+- **Development**: pnpm + ESLint 9 + Prettier + Husky + React Compiler
+
+## Architecture Pattern
+**LUÔN tuân thủ**: Components → Hooks → Services → API
+- **Components** (`src/components/`): UI components (auth, chat, layout, ui)
+- **Hooks** (`src/hooks/`): Logic tái sử dụng (useApiGet, useApiPost, useMobile, useTypewriter)
+- **Services** (`src/services/`): Cấu hình React Query, query keys factory
+- **API** (`src/api/`): Cấu hình Axios, interceptors, generic handlers
+
+## Key Technical Patterns
+
+### State Management Pattern
+- **Zustand stores** → global state (shared across components)
+- **React useState** → local component state (chỉ dùng trong 1 component)
+- **TanStack Query** → server state, API calls dùng custom hooks (useApiGet/Post) - KHÔNG fetch trong useEffect
+- Query keys định nghĩa trong `services/queryKeys.ts`
+
+### API Pattern
+- **Axios** với interceptors: auto JWT refresh on 401, error transformation với i18n
+- **Generic handlers**: get, post, put, patch, delete, upload (`api/index.ts`)
+- **Backend proxy**: `/chat/:path*` → `/api/chat/:path*` → backend API
+
+## Cấu Trúc Thư Mục Chính
+- `api/`: Cấu hình API (config.ts, interceptors.ts, generic handlers)
+- `app/`: Next.js App Router (layout.tsx, page.tsx, history/, api/chat/[...path]/)
+- `components/`: React components (auth, chat, layout, ui)
+- `constants/`: Hằng số ứng dụng (response.ts, theme.ts, sidebar.ts)
+- `hooks/`: Custom React hooks (useApiGet, useApiPost, useMobile, useTypewriter)
+- `i18n/`: Cài đặt đa ngôn ngữ (config.ts, I18nProvider.tsx, locales/en, locales/vi)
+- `interfaces/`: TypeScript types (api.ts, chat.ts, auth.ts, user.ts, ui.ts)
+- `lib/`: Thư viện tiện ích (utils.ts với cn() helper)
+- `services/`: Cài đặt React Query (QueryProvider.tsx, queryClient.ts, queryKeys.ts)
+- `store/`: Quản lý state với Zustand (authStore, chatStore, uiStore)
+- `styles/`: Global styles (globals.css với Tailwind + CSS variables)
+- `utils/`: Hàm tiện ích (helper.ts, proxyUtils.ts)
+
+## Nguyên Tắc Phát Triển
+1. **TypeScript Everywhere**: Strict typing cho độ tin cậy và dễ bảo trì
+2. **Component Composition**: UI components tái sử dụng với shadcn/ui pattern
+3. **Hook-based Logic**: Custom hooks để tách biệt business logic
+4. **Theme-Aware Design**: Styling nhất quán với hỗ trợ dark/light mode
+5. **Mobile-First**: Responsive design tối ưu cho mọi thiết bị
+6. **Performance Focused**: React Compiler, lazy loading, query caching
+7. **Security First**: JWT authentication, input validation, XSS protection
+8. **Developer Experience**: Auto-formatting, linting, type checking, git hooks
+9. **i18n Support**: Đa ngôn ngữ đầy đủ với Tiếng Việt/Tiếng Anh
+10. **Error Resilience**: Xử lý lỗi tập trung với toast notifications
+
+## Tổ Chức Routes
+
+### File-based Routes (Next.js App Router)
+- `/` - Trang chủ (ChatMessage component)
+- `/history` - Trang lịch sử chat (với auth check, mock data)
+- `/api/chat/[...path]` - Backend proxy (GET, POST, PUT, PATCH, DELETE)
+
+### URL Rewrite Rules
+- `/chat/:path*` rewrite thành `/api/chat/:path*` (trong next.config.ts)
+
+## Tiêu Chuẩn Code Quality
+- **TypeScript**: Strict mode, path alias `@/*` → `./src/*`
+- **ESLint + Prettier**: Auto-fix on pre-commit (Husky + lint-staged)
+- **Error Handling**: Tập trung trong axios interceptors, i18n support, toast notifications
+
+## Environment Variables
+
+### Public Variables (Client-side)
+Biến với prefix `NEXT_PUBLIC_` sẽ được expose ra client-side:
+- `NEXT_PUBLIC_API_URL` - API endpoint cho frontend (default: `http://localhost:3000/api`)
+- `BACKEND_API_URL` - Direct backend API URL (tùy chọn, nếu cần bypass Next.js API routes)
+
+### Private Variables (Server-side Only)
+Biến **KHÔNG có** prefix `NEXT_PUBLIC_` chỉ có thể truy cập từ server-side:
+- `API_SECRET_KEY` - API secret keys
+- `JWT_SECRET` - JWT signing secret
+- `DATABASE_URL` - Database connection string
+
+### Environment Files
+- `.env.local` - Development local (không commit, gitignore)
+- `.env.staging` - Staging environment config
+- `.env.production` - Production environment config
+- Support với `dotenv-cli` cho multi-environment
+
+### ⚠️ Security Warning
+**NEVER** expose sensitive data (API keys, secrets, passwords) với `NEXT_PUBLIC_` prefix!
+
+## Lưu Ý Quan Trọng
+
+### Tính Năng Chính
+- **i18n**: English (default) + Vietnamese, tự động detect ngôn ngữ trình duyệt
+- **Dark Mode**: CSS variables (oklch), next-themes, chuyển đổi system/manual
+- **Responsive**: useIsMobile hook, tách biệt Desktop/Mobile headers
+- **Security**: JWT tokens, input validation, XSS protection
+
+## Yêu Cầu Hệ Thống
+- **Node.js**: >= 22.21.1 (khuyến nghị phiên bản LTS)
+- **Package Manager**: pnpm >= 10.0.0
+- **Git**: Version control system
+- **Browser**: Trình duyệt hiện đại hỗ trợ ES2017+
+
+## Quick Start Commands
+```bash
+# Cài đặt dependencies
+pnpm install
+
+# Development (Turbopack)
+pnpm dev
+
+# Build cho production
+pnpm build
+
+# Chạy production server
+pnpm start
+
+# Kiểm tra code quality
+pnpm lint:fix && pnpm format && pnpm type-check
+```
+
+## Git Commit Message Generation Rules
+Xem chi tiết tại [Git Commit Instructions](.github/git-commit-instructions.md)
