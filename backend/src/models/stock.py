@@ -10,6 +10,7 @@ class Ticker(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
     symbol: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
     company_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    exchange: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, index=True)  # HOSE, HNX, UPCOM
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")

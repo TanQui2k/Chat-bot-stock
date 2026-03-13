@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 class TickerBase(BaseModel):
     symbol: str
     company_name: Optional[str] = None
+    exchange: Optional[str] = None  # HOSE, HNX, UPCOM
     is_active: bool = True
 
 class TickerResponse(TickerBase):
