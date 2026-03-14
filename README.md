@@ -1,101 +1,110 @@
-# Chat-bot-stock (StockAI Predictor)
+# 🚀 Chat-bot-stock (StockAI Predictor)
 
-Dự án này bao gồm hai phần chính: **Backend** (FastAPI) và **Frontend** (Next.js). Dưới đây là hướng dẫn chi tiết để thiết lập và khởi chạy dự án trên máy tính cục bộ.
+Một ứng dụng hỗ trợ dự đoán và phân tích chứng khoán sử dụng trí tuệ nhân tạo (AI). Dự án được xây dựng với kiến trúc hiện đại, bao gồm **Backend (FastAPI)** và **Frontend (Next.js)**.
+
+## ✨ Tính năng nổi bật
+
+- 📈 **Phân tích chứng khoán**: Theo dõi và phân tích dữ liệu thị trường.
+- 🤖 **Chat-bot thông minh**: Hỗ trợ giải đáp các câu hỏi về tài chính và chứng khoán.
+- ⚡ **Hiệu năng cao**: Backend viết bằng FastAPI cung cấp phản hồi cực nhanh.
+- 🎨 **Giao diện hiện đại**: Frontend chuẩn React/Next.js mượt mà và trực quan.
+
+## 🏗 Cấu trúc dự án
+
+```text
+Chat-bot-stock/
+├── backend/          # Nguồn cấp dữ liệu và xử lý AI (FastAPI)
+├── frontend/         # Giao diện người dùng (Next.js/React)
+├── .gitignore        # Cấu hình bỏ qua các tệp không cần thiết
+└── README.md         # Hướng dẫn dự án
+```
+
+---
 
 ## 🛠 Yêu cầu hệ thống (Prerequisites)
 
-Trước khi bắt đầu, hãy đảm bảo máy tính của bạn đã cài đặt các phần mềm sau:
-- **Python 3.8+** (cho Backend)
-- **Node.js 18+** & **npm/yarn/pnpm** (cho Frontend)
-- **PostgreSQL** (Hệ quản trị cơ sở dữ liệu)
+Đảm bảo máy của bạn đã cài:
+
+- **Python 3.10+** (Backend)
+- **Node.js 18+** & **npm/yarn/pnpm** (Frontend)
+- **PostgreSQL** (Cơ sở dữ liệu)
 
 ---
 
-## ⚙️ Thiết lập Database
+## ⚙️ Hướng dẫn cài đặt
 
-1. Cài đặt và khởi động PostgreSQL.
-2. Tạo một database mới cho dự án (ví dụ: `stock_db`).
-3. (Tùy chọn) Đảm bảo user/mật khẩu PostgreSQL khớp với cấu hình trong Backend.
+### 1. Thiết lập Database
 
----
+1. Cài đặt và chạy dịch vụ **PostgreSQL**.
+2. Tạo một database mới tên: `stock_db`.
 
-## 🐍 Thiết lập Backend (FastAPI)
+### 2. Thiết lập Backend (FastAPI)
 
 1. **Di chuyển vào thư mục backend**:
+
    ```bash
    cd backend
    ```
 
-2. **Tạo và kích hoạt môi trường ảo (Virtual Environment)**:
-   - Trên Windows:
-     ```bash
-     python -m venv .venv
-     .venv\Scripts\activate
-     ```
-   - Trên macOS/Linux:
-     ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
-     ```
+2. **Tạo môi trường ảo & Cài đặt thư viện**:
 
-3. **Cài đặt các thư viện phụ thuộc (Dependencies)**:
    ```bash
+   python -m venv .venv
+   # Active trên Windows:
+   .venv\Scripts\activate
+   # Active trên Linux/MacOS:
+   source .venv/bin/activate
+
    pip install -r requirements.txt
    ```
 
-4. **Cấu hình môi trường**:
-   - Nếu chưa có file `.env`, hãy tạo một file tên `.env` trong thư mục `backend/` dựa trên cấu hình mẫu.
-   - Cập nhật chuỗi kết nối PostgreSQL (thay thế `<username>`, `<password>`, `<host>`, `<port>`, `<database_name>` cho phù hợp với máy tính của bạn), ví dụ:
+3. **Cấu hình môi trường**:
+
+   - Tạo file `.env` trong thư mục `backend/`.
+   - Cập nhật chuỗi kết nối PostgreSQL:
+
      ```env
-     DATABASE_URL=postgresql+psycopg://root:postgres@127.0.0.1:5432/stock_db
+     DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/stock_db
      ```
 
-5. **Chạy Migration Database (Khởi tạo các bảng cơ sở dữ liệu)**:
+4. **Khởi tạo Database (Migrations)**:
+
    ```bash
    alembic upgrade head
    ```
-   *(Đảm bảo đã thiết lập database và file `.env` đúng với cấu hình database của bạn trước khi chạy bước này)*
 
-6. **Chạy Server Backend**:
+5. **Chạy Server**:
+
    ```bash
    uvicorn src.main:app --reload
    ```
-   - Backend sẽ chạy tại: `http://localhost:8000`
-   - Tài liệu API Swagger UI (dùng để test API): `http://localhost:8000/docs`
 
----
+   > 🔗 Truy cập: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
 
-## 💻 Thiết lập Frontend (Next.js)
+### 3. Thiết lập Frontend (Next.js)
 
 1. **Di chuyển vào thư mục frontend**:
+
    ```bash
-   # Mở một cửa sổ terminal mới (hoặc tab mới), di chuyển vào thư mục root của dự án
    cd frontend
    ```
 
-2. **Cài đặt dependencies**:
+2. **Cài đặt & Chạy Development**:
+
    ```bash
    npm install
-   # hoặc
-   yarn install
-   # hoặc
-   pnpm install
+   npm run dev
    ```
 
-3. **Chạy Server Frontend (Development mode)**:
-   ```bash
-   npm run dev
-   # hoặc
-   yarn dev
-   # hoặc
-   pnpm dev
-   ```
-   - Frontend sẽ chạy tại: `http://localhost:3000`
+   > 🔗 Truy cập: [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🚀 Cách sử dụng
+## 🚀 Quy trình sử dụng
 
-1. Đợi cả **Backend** và **Frontend** đều đang chạy trên hai terminal riêng biệt, không có lỗi.
-2. Mở trình duyệt và truy cập vào [http://localhost:3000](http://localhost:3000) để sử dụng ứng dụng.
-3. Nếu frontend cần gọi api, api sẽ tự gọi đến backend `http://localhost:8000/api/...` (đã được config CORS).
+1. Đảm bảo cả hai máy chủ (Backend & Frontend) đang chạy đồng thời.
+2. Truy cập cổng `3000` trên trình duyệt để bắt đầu trải nghiệm.
+
+## 📄 Giấy phép
+
+Dự án được phát triển cho mục đích học tập và nghiên cứu.
