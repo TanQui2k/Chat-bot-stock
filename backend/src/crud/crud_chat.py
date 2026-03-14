@@ -1,0 +1,24 @@
+from sqlalchemy.orm import Session
+from src.models.user import ChatSession, ChatMessage
+from src.schemas.chat_schema import SessionCreate, MessageCreate
+from uuid import UUID
+
+def get_sessions(db: Session, user_id: UUID):
+    return db.query(ChatSession).filter(ChatSession.user_id == user_id).all()
+
+def create_session(db: Session, session: SessionCreate):
+    db_session = ChatSession(user_id=session.user_id, title=session.title)
+    db.add(db_session)
+    db.commit()
+    db.refresh(db_session)
+    return db_session
+
+def get_messages(db: Session, session_id: UUID):
+    return db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+
+def create_message(db: Session, session_id: UUID, message: MessageCreate):
+    db_message = ChatMessage(session_id=session_id, role=message.role, content=message.content)
+    db.add(db_message)
+    db.commit()
+    db.refresh(db_message)
+    return db_message
