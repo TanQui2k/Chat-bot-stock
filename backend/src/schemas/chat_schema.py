@@ -20,6 +20,15 @@ class MessageResponse(MessageBase):
     
     model_config = ConfigDict(from_attributes=True)
 
+
+class ChatTurnRequest(BaseModel):
+    content: str
+
+
+class ChatTurnResponse(BaseModel):
+    user_message: MessageResponse
+    assistant_message: MessageResponse
+
 # ==========================================
 # Chat Session Schemas
 # ==========================================
