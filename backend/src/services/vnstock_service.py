@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
 from time import monotonic
 from typing import Any, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -39,28 +43,58 @@ class VnStockPriceService:
         # vnstock v3+: use Quote API
         try:
             from vnstock.api.quote import Quote  # type: ignore
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError("vnstock is not installed or failed to import") from e
+        except ImportError as e:
+            logger.error("vnstock is not installed or failed to import: %s", e)
+            raise RuntimeError(
+                "vnstock is not installed. Please install it with: pip install vnstock"
+            ) from e
+        except Exception as e:
+            logger.error("Failed to import vnstock: %s", e)
+            raise RuntimeError(
+                "Failed to import vnstock module. Please ensure vnstock is installed correctly."
+            ) from e
 
         df = None
         try:
             df = Quote(symbol=symbol).intraday(page_size=50)
-        except Exception:
+            logger.debug("Successfully fetched intraday data for %s", symbol)
+        except Exception as e:
+            logger.warning("Intraday fetch failed for %s: %s. Trying historical data...", symbol, e)
             df = None
 
         if df is None:
-            end = date.today()
-            start = end - timedelta(days=10)
-            df = Quote(symbol=symbol).history(
-                start=start.strftime("%Y-%m-%d"),
-                end=end.strftime("%Y-%m-%d"),
-            )
+            try:
+                end = date.today()
+                start = end - timedelta(days=10)
+                df = Quote(symbol=symbol).history(
+                    start=start.strftime("%Y-%m-%d"),
+                    end=end.strftime("%Y-%m-%d"),
+                )
+                logger.debug("Successfully fetched historical data for %s", symbol)
+            except Exception as e:
+                logger.error("Historical data fetch failed for %s: %s", symbol, e)
+                raise RuntimeError(
+                    f"Failed to fetch price data for {symbol}. Please check if the ticker symbol is correct."
+                ) from e
 
         # Extract last row price from common columns
         row = _last_row_as_dict(df)
+        if not row:
+            logger.error("No data returned from vnstock for %s", symbol)
+            raise RuntimeError(
+                f"No price data available for {symbol}. The ticker may be delisted or inactive."
+            )
+
         price = _pick_first_number(row, ["price", "match_price", "last", "close", "adj_close", "value"])
         if price is None:
-            raise RuntimeError(f"Could not extract price from vnstock data columns: {list(row.keys())}")
+            logger.error(
+                "Could not extract price from vnstock data columns for %s. Available columns: %s",
+                symbol,
+                list(row.keys()),
+            )
+            raise RuntimeError(
+                f"Could not extract price from vnstock data for {symbol}. Available columns: {list(row.keys())}"
+            )
 
         as_of = _pick_first_str(row, ["time", "datetime", "date", "trading_date"])
         value = StockPrice(symbol=symbol, price=float(price), as_of=as_of)

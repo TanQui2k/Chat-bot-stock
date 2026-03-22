@@ -1,21 +1,33 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 from src.core.config import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMService:
     def __init__(self) -> None:
         if not settings.OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY is not set in .env")
-
-        self._client = OpenAI(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL or None,
-        )
+            logger.warning(
+                "OPENAI_API_KEY is not set. Some features may not work. "
+                "Set it in .env file to enable AI chat features."
+            )
+            self._client = None
+        else:
+            try:
+                self._client = OpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    base_url=settings.OPENAI_BASE_URL or None,
+                )
+            except Exception as e:
+                logger.error("Failed to initialize OpenAI client: %s", e)
+                self._client = None
 
     def natural_chat_answer(
         self,
@@ -23,11 +35,16 @@ class LLMService:
         question: str,
         history: list[dict[str, str]] | None = None,
         context: list[str] | None = None,
-    ) -> str:
+    ) -> str | None:
         """
         Generic VN chat answer, with optional recent history + grounding context lines.
         history: list of OpenAI message dicts: {"role": "user"|"assistant", "content": "..."}
+        Returns None if OpenAI is not configured.
         """
+        if not self._client:
+            logger.warning("OpenAI client not initialized. Cannot answer question.")
+            return None
+
         system = (
             "Bạn là trợ lý chứng khoán Việt Nam. "
             "Nếu người dùng hỏi dữ liệu/giá cụ thể, chỉ trả lời khi có dữ liệu trong CONTEXT; "
@@ -48,12 +65,19 @@ class LLMService:
                     messages.append({"role": m["role"], "content": m["content"]})
         messages.append({"role": "user", "content": user})
 
-        resp = self._client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            messages=messages,
-            temperature=0.4,
-        )
-        return (resp.choices[0].message.content or "").strip()
+        try:
+            resp = self._client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=messages,
+                temperature=0.4,
+            )
+            return (resp.choices[0].message.content or "").strip()
+        except OpenAIError as e:
+            logger.error("OpenAI API error: %s", e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error during OpenAI API call: %s", e)
+            return None
 
     def natural_price_answer(
         self,
