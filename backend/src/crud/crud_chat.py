@@ -54,15 +54,6 @@ def create_message(db: Session, session_id: UUID, message: MessageCreate):
 
 def _db_safe_text(text: str) -> str:
     """
-    Best-effort: avoid crashes when DB/client encoding cannot represent some Vietnamese characters.
-    If cp1258 encoding fails, strip diacritics.
+    Return text directly since database and client encoding are configured to UTF8.
     """
-    if text is None:
-        return ""
-    try:
-        text.encode("cp1258")
-        return text
-    except UnicodeEncodeError:
-        normalized = unicodedata.normalize("NFKD", text)
-        stripped = "".join(ch for ch in normalized if not unicodedata.combining(ch))
-        return stripped
+    return text if text is not None else ""

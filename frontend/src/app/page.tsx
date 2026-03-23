@@ -22,15 +22,15 @@ export default function Dashboard() {
       </div>
 
       {/* Main Grid Layout Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         
         {/* Left Column: Market Chart (2/3 width on desktop) */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="lg:col-span-2 flex flex-col gap-6 min-h-0">
           <InteractiveChart symbol="FPT" />
           
           {/* Sentiment & Quick Insights Widgets */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 shrink-0">
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col justify-between h-[150px]">
                <h3 className="text-sm font-semibold text-slate-400 mb-3 flex items-center gap-2">
                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-emerald-500">
                    <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clipRule="evenodd" />
@@ -53,7 +53,7 @@ export default function Dashboard() {
         </div>
 
         {/* Right Column: AI Trading Assistant (1/3 width on desktop) */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:h-[calc(100vh-12rem)] sticky top-24">
           <ChatInterface />
         </div>
 

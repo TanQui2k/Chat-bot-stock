@@ -33,7 +33,7 @@ export default function InteractiveChart({ symbol }: { symbol: string }) {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`http://localhost:9000/api/stocks/${symbol}/history`);
+        const res = await fetch(`http://localhost:8000/api/stocks/${symbol}/history`);
         if (!res.ok) throw new Error("Lỗi tải dữ liệu hoặc mã không tồn tại!");
         
         const json = await res.json();

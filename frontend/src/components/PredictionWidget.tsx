@@ -15,7 +15,7 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
         setError(null);
         
         // Fetch from the backend predict API
-        const response = await fetch('http://localhost:9000/api/predict/', {
+        const response = await fetch('http://localhost:8000/api/predict/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

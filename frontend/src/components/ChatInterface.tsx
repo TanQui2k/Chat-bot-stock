@@ -21,6 +21,7 @@ export default function ChatInterface() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,32 +31,52 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  // Khởi tạo Chat Session thật qua /api/chat/sessions
+  // Tự động Focus lại ô input sau khi AI trả lời xong
   useEffect(() => {
-    const initSession = async () => {
-      try {
-        const userId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-            ? crypto.randomUUID() 
-            : '123e4567-e89b-12d3-a456-426614174000'.replace(/[xy]/g, function(c) {
-                var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-              });
-        
-        const res = await fetch('http://localhost:9000/api/chat/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, title: 'Phiên Chat Giao Diện' })
-        });
-        const data = await res.json();
-        if (data.id) setSessionId(data.id);
-      } catch (err) {
-        console.error("Không thể khởi tạo session Backend:", err);
-      } finally {
-        setIsInitializing(false);
-      }
-    };
+    if (!isLoading && !isInitializing) {
+      inputRef.current?.focus();
+    }
+  }, [isLoading, isInitializing]);
+
+  // Khởi tạo Chat Session thật qua /api/chat/sessions
+  const initSession = async () => {
+    setIsInitializing(true);
+    try {
+      const userId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+          ? crypto.randomUUID() 
+          : '123e4567-e89b-12d3-a456-426614174000'.replace(/[xy]/g, function(c) {
+              var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+      
+      const res = await fetch('http://localhost:8000/api/chat/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, title: 'Phiên Chat Giao Diện' })
+      });
+      const data = await res.json();
+      if (data.id) setSessionId(data.id);
+    } catch (err) {
+      console.error("Không thể khởi tạo session Backend:", err);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  useEffect(() => {
     initSession();
   }, []);
+
+  const handleReset = () => {
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: 'Xin chào! Mình là Trợ lý AI Chứng khoán. Mình có thể hỗ trợ thông tin giá và phân tích chuyên sâu cho bạn. VD: "Giá FPT bao nhiêu?"'
+      }
+    ]);
+    initSession();
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -72,7 +93,7 @@ export default function ChatInterface() {
 
     try {
       // Gọi Endpoint thật trên Backend: POST /sessions/{id}/turn
-      const res = await fetch(`http://localhost:9000/api/chat/sessions/${sessionId}/turn`, {
+      const res = await fetch(`http://localhost:8000/api/chat/sessions/${sessionId}/turn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: userMsg }),
@@ -117,6 +138,17 @@ export default function ChatInterface() {
           </span>
           <h2 className="text-base font-semibold text-slate-200">Trợ lý Tương tác AI</h2>
         </div>
+        
+        <button 
+          onClick={handleReset}
+          className="px-2.5 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/50 hover:bg-slate-700/50 hover:border-slate-600 text-slate-400 hover:text-emerald-400 transition-all flex items-center gap-1.5 text-xs font-semibold shadow-sm focus:outline-none"
+          title="Làm mới cuộc trò chuyện"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+            <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.25a.75.75 0 00-.75.75v3.982a.75.75 0 001.5 0v-2.18l.423.423a7 7 0 0011.666-3.86.75.75 0 00-1.777-.282zm-10.624-2.848a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h3.982a.75.75 0 00.75-.75V3.439a.75.75 0 00-1.5 0v2.18l-.423-.423a7 7 0 00-11.666 3.86.75.75 0 001.777.282z" clipRule="evenodd" />
+          </svg>
+          Làm mới
+        </button>
       </div>
       
       {/* Chat History Messages */}
@@ -161,6 +193,7 @@ export default function ChatInterface() {
       <div className="p-4 border-t border-slate-700/80 bg-slate-800/80 rounded-b-2xl">
         <div className="relative flex items-center">
           <input 
+            ref={inputRef}
             type="text" 
             value={input}
             onChange={(e) => setInput(e.target.value)}
