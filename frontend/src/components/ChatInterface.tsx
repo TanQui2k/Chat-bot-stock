@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { predictStock } from '../lib/api';
 
 type Message = {
   id: string;
@@ -14,11 +13,13 @@ export default function ChatInterface() {
     {
       id: '1',
       role: 'assistant',
-      content: 'Xin chào! Mình đang theo dõi nhóm ngành viễn thông công nghệ. Mình có thể giúp gì cho danh mục của bạn?'
+      content: 'Xin chào! Mình là Trợ lý AI Chứng khoán. Mình có thể hỗ trợ thông tin giá và phân tích chuyên sâu cho bạn. VD: "Giá FPT bao nhiêu?"'
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -29,29 +30,72 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
+  // Khởi tạo Chat Session thật qua /api/chat/sessions
+  useEffect(() => {
+    const initSession = async () => {
+      try {
+        const userId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+            ? crypto.randomUUID() 
+            : '123e4567-e89b-12d3-a456-426614174000'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+              });
+        
+        const res = await fetch('http://localhost:9000/api/chat/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, title: 'Phiên Chat Giao Diện' })
+        });
+        const data = await res.json();
+        if (data.id) setSessionId(data.id);
+      } catch (err) {
+        console.error("Không thể khởi tạo session Backend:", err);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+    initSession();
+  }, []);
+
   const handleSend = async () => {
     if (!input.trim()) return;
+    if (!sessionId) {
+      alert("Kết nối Chatbot chưa sẵn sàng hoặc Backend chưa khởi tạo thành công. Vui lòng F5 tải lại trang!");
+      return;
+    }
     
+    // Gửi tin nhắn user lên UI nội bộ trước
     const userMsg = input.trim();
     setInput('');
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: userMsg }]);
     setIsLoading(true);
 
     try {
-      // Logic mock: Trích xuất mã chứng khoán nếu có, nếu không thì mặc định là FPT
-      const match = userMsg.match(/[a-zA-Z]{3}/);
-      const ticker = match ? match[0].toUpperCase() : "FPT";
-
-      const res = await predictStock(ticker);
+      // Gọi Endpoint thật trên Backend: POST /sessions/{id}/turn
+      const res = await fetch(`http://localhost:9000/api/chat/sessions/${sessionId}/turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: userMsg }),
+      });
       
-      const assistantMsg = `Dự đoán cho ${res.ticker}: ${res.prediction} với độ tin cậy ${(res.probability * 100).toFixed(0)}%.`;
+      if (!res.ok) throw new Error("Backend API gặp lỗi hoặc chưa phản hồi.");
       
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: assistantMsg }]);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      // Parse payload trả về (ChatTurnResponse chứa assistant_message)
+      const turnResponse = await res.json();
+      const assistantText = turnResponse.assistant_message.content;
+      
+      setMessages(prev => [
+        ...prev, 
+        { 
+          id: turnResponse.assistant_message.id.toString(), 
+          role: 'assistant', 
+          content: assistantText 
+        }
+      ]);
+    } catch (error: any) {
       setMessages(prev => [
         ...prev,
-        { id: Date.now().toString(), role: 'assistant', content: `Lỗi: ${message}` }
+        { id: Date.now().toString(), role: 'assistant', content: `Lỗi kết nối LLM: ${error.message}` }
       ]);
     } finally {
       setIsLoading(false);
@@ -59,9 +103,7 @@ export default function ChatInterface() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSend();
-    }
+    if (e.key === 'Enter') handleSend();
   };
 
   return (
@@ -73,7 +115,7 @@ export default function ChatInterface() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
           </span>
-          <h2 className="text-base font-semibold text-slate-200">Trợ lý giao dịch AI</h2>
+          <h2 className="text-base font-semibold text-slate-200">Trợ lý Tương tác AI</h2>
         </div>
       </div>
       
@@ -82,15 +124,15 @@ export default function ChatInterface() {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {msg.role === 'assistant' ? (
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20 text-slate-900 font-bold text-xs">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20 text-slate-900 font-bold text-xs uppercase">
                 AI
               </div>
             ) : (
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-lg text-xs font-bold text-white">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-lg text-xs font-bold text-white uppercase">
                 VA
               </div>
             )}
-            <div className={`rounded-2xl p-3.5 text-sm shadow-sm border leading-relaxed ${
+            <div className={`rounded-2xl p-3.5 text-sm shadow-sm border leading-relaxed whitespace-pre-wrap ${
               msg.role === 'user' 
                 ? 'bg-emerald-600/20 rounded-tr-sm text-emerald-50 border-emerald-500/30' 
                 : 'bg-slate-700/50 rounded-tl-sm text-slate-200 border-slate-600/50'
@@ -123,12 +165,13 @@ export default function ChatInterface() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Hỏi mã cổ phiếu (VD: VCB, FPT)..." 
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-16 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
+            placeholder={isInitializing ? "Đang kết nối Backend..." : "Nhắn tin cho AI..."} 
+            disabled={isInitializing || isLoading}
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-16 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-all shadow-inner disabled:opacity-50"
           />
           <button 
             onClick={handleSend}
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || !input.trim() || isInitializing}
             className="absolute right-2 p-1.5 rounded-lg bg-emerald-500 text-slate-900 hover:bg-emerald-400 font-medium text-xs transition-colors disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500"
           >
             Gửi

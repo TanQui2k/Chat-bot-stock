@@ -7,8 +7,24 @@ import unicodedata
 def get_sessions(db: Session, user_id: UUID):
     return db.query(ChatSession).filter(ChatSession.user_id == user_id).all()
 
+from src.models.user import User
+
 def create_session(db: Session, session: SessionCreate):
-    db_session = ChatSession(user_id=session.user_id, title=session.title)
+    # Handle anonymous user requests from UI by creating a placeholder User
+    user = db.query(User).filter(User.id == session.user_id).first()
+    if not user:
+        user = User(
+            id=session.user_id,
+            username=f"UI_{str(session.user_id)[:8]}",
+            email=f"ui_{session.user_id}@chat.local",
+            hashed_password="none"
+        )
+        db.add(user)
+        db.commit()
+    
+    # Safe text handling for Windows db locales
+    safe_title = _db_safe_text(session.title) if session.title else None
+    db_session = ChatSession(user_id=session.user_id, title=safe_title)
     db.add(db_session)
     db.commit()
     db.refresh(db_session)

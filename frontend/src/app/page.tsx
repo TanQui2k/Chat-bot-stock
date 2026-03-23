@@ -1,6 +1,7 @@
 import React from "react";
 import InteractiveChart from "../components/InteractiveChart";
 import ChatInterface from "../components/ChatInterface";
+import PredictionWidget from "../components/PredictionWidget";
 
 export default function Dashboard() {
   return (
@@ -38,7 +39,7 @@ export default function Dashboard() {
                </h3>
                <div>
                  <div className="flex items-end gap-3 mb-4">
-                   <div className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Tăng giá</div>
+                   <div className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Tích cực</div>
                    <div className="text-sm text-emerald-500 font-medium mb-1">↑ 92% Tin cậy</div>
                  </div>
                  <div className="w-full bg-slate-900 rounded-full h-2">
@@ -47,16 +48,7 @@ export default function Dashboard() {
                </div>
             </div>
             
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col justify-between">
-               <h3 className="text-sm font-semibold text-slate-400 mb-3">Xu hướng dự đoán (24h tới)</h3>
-               <div>
-                 <div className="flex items-end gap-3 mb-2">
-                   <div className="text-3xl font-bold text-slate-100">+2,1%</div>
-                   <div className="text-sm text-slate-400 font-medium mb-1">Mục tiêu: 115.000 ₫</div>
-                 </div>
-                 <p className="text-xs text-slate-500">Dựa trên mô hình đa lớp phân tích văn bản tin tức tài chính và dòng tiền trong 7 ngày qua.</p>
-               </div>
-            </div>
+            <PredictionWidget symbol="FPT" />
           </div>
         </div>
 
