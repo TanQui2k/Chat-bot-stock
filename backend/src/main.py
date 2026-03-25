@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.routes import stocks, chat, predict, assistant
+from src.api.routes import stocks, chat, predict, assistant, auth
 
 app = FastAPI(
     title="StockAI Predictor API",
@@ -20,6 +20,7 @@ app.include_router(stocks.router, prefix="/api")
 app.include_router(predict.router, prefix="/api/predict", tags=["Prediction"])
 app.include_router(chat.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 
 @app.get("/")
 def read_root():

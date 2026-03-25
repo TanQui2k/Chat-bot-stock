@@ -1,57 +1,249 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+"use client";
 
-export interface PredictRequest {
-  ticker: string;
+// API Client for StockAI Application
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+  message?: string;
 }
 
-export interface PredictResponse {
-  ticker: string;
-  prediction: string; // VD: "Tăng giá", "Giảm giá", "Đi ngang"
-  probability: number; // VD: 0.92 cho 92% độ tin cậy
+// ==========================================
+// Authentication API
+// ==========================================
+
+export interface PhoneVerificationRequest {
+  phone_number: string;
 }
 
-/**
- * Gửi yêu cầu dự đoán cổ phiếu tới backend.
- * @param ticker Mã chứng khoán (VD: "FPT", "VCB")
- * @returns Một promise trả về dữ liệu PredictResponse
- */
-export async function predictStock(ticker: string): Promise<PredictResponse> {
-  const payload: PredictRequest = { ticker };
+export interface PhoneVerificationVerify {
+  phone_number: string;
+  verification_code: string;
+}
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/predict`, {
+export interface GoogleLoginRequest {
+  id_token: string;
+}
+
+export interface AuthUser {
+  id: string;
+  username?: string;
+  email?: string;
+  full_name?: string;
+  avatar_url?: string;
+  phone_number?: string;
+  phone_verified: boolean;
+  google_id?: string;
+  auth_providers: string[];
+  default_auth_method: string;
+  is_active: boolean;
+  created_at: string;
+  last_login?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
+export interface AuthMethods {
+  phone: boolean;
+  google: boolean;
+  password: boolean;
+}
+
+// Auth API
+export const authApi = {
+  // Phone Authentication
+  sendPhoneCode: async (phone: string): Promise<{ message: string; code: string }> => {
+    const response = await fetch(`${API_BASE_URL}/auth/phone/send-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone_number: phone }),
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to send verification code");
+    }
+    return data;
+  },
+
+  verifyPhoneCode: async (
+    phone: string,
+    code: string
+  ): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/phone/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone_number: phone,
+        verification_code: code,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Invalid verification code");
+    }
+    return data;
+  },
+
+  // Google OAuth
+  googleLogin: async (idToken: string): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/google/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id_token: idToken }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Google login failed");
+    }
+    return data;
+  },
+
+  // Password Login
+  login: async (
+    identifier: string,
+    password: string
+  ): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier, password }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Invalid credentials");
+    }
+    return data;
+  },
+
+  // Profile
+  getProfile: async (token: string): Promise<AuthUser> => {
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to get profile");
+    }
+    return data;
+  },
+
+  getAuthMethods: async (token: string): Promise<AuthMethods> => {
+    const response = await fetch(`${API_BASE_URL}/auth/auth-methods`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to get auth methods");
+    }
+    return data;
+  },
+
+  // Logout
+  logout: async (token: string): Promise<{ message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(payload),
     });
 
+    const data = await response.json();
     if (!response.ok) {
-      // Cố gắng phân tích chi tiết lỗi gửi về từ server
-      let errorMessage = "Đã xảy ra lỗi không xác định từ máy chủ.";
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-      } catch {
-        // Dự phòng nếu response trả về không phải định dạng JSON
-        errorMessage = `Lỗi HTTP ${response.status}: ${response.statusText}`;
-      }
-      throw new Error(`Không thể lấy dự đoán cho mã cổ phiếu: ${errorMessage}`);
+      throw new Error(data.detail || "Logout failed");
     }
-
-    const data: PredictResponse = await response.json();
     return data;
-  } catch (error) {
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      throw new Error("Lỗi mạng: Không thể kết nối tới máy chủ backend. Vui lòng kiểm tra lại API.");
-    }
-    
-    // Ném lại lỗi nếu đó đã là các Error được tuỳ chỉnh ở trên, nếu không thì bọc lại
-    if (error instanceof Error) {
-      throw error;
-    }
-    
-    throw new Error("Đã xảy ra lỗi không xác định trong quá trình gửi yêu cầu dự đoán.");
-  }
+  },
+};
+
+// ==========================================
+// Stock API (Existing)
+// ==========================================
+
+export interface StockPrice {
+  symbol: string;
+  price: number;
+  currency: string;
+  as_of: string;
 }
+
+export interface StockInfo {
+  symbol: string;
+  name?: string;
+  price: number;
+  change?: number;
+  change_percent?: number;
+  volume?: number;
+  market_cap?: number;
+}
+
+export const stockApi = {
+  getLatestPrice: async (symbol: string): Promise<StockPrice> => {
+    const response = await fetch(`${API_BASE_URL}/stocks/price/${symbol}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to get stock price");
+    }
+    return data;
+  },
+
+  getStockInfo: async (symbol: string): Promise<StockInfo> => {
+    const response = await fetch(`${API_BASE_URL}/stocks/info/${symbol}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to get stock info");
+    }
+    return data;
+  },
+};
+
+// ==========================================
+// Chat API (Existing)
+// ==========================================
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
+export const chatApi = {
+  sendMessage: async (
+    message: string,
+    token: string
+  ): Promise<{ content: string; timestamp: string }> => {
+    const response = await fetch(`${API_BASE_URL}/chat/message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to send message");
+    }
+    return data;
+  },
+};

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import InteractiveChart from "../components/InteractiveChart";
 import ChatInterface from "../components/ChatInterface";
 import PredictionWidget from "../components/PredictionWidget";
+import { AuthModal } from "../components/AuthModal";
+import { authApi, AuthUser } from "../lib/api";
 
 const popularTickers = ['FPT', 'VNM', 'MSN', 'VPB', 'ACB', 'HPG', 'VIC', 'VCB'];
 
@@ -12,6 +14,142 @@ export default function Dashboard() {
   const [timeframe, setTimeframe] = useState('1M');
   const [showTickerMenu, setShowTickerMenu] = useState(false);
   
+  // Authentication state
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          const user = await authApi.getProfile(token);
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        localStorage.removeItem('access_token');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleLoginSuccess = (user: AuthUser) => {
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    // Store token in localStorage
+    // Note: In a real app, store in httpOnly cookie for better security
+    localStorage.setItem('access_token', 'mock_token_for_demo');
+  };
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        await authApi.logout(token);
+      }
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setCurrentUser(null);
+      localStorage.removeItem('access_token');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900">
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleLoginSuccess}
+      />
+
+      {/* Navbar */}
+      <nav className="bg-slate-800/50 backdrop-blur-md border-b border-slate-700/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">AI</span>
+              </div>
+              <span className="text-xl font-bold text-slate-100">StockAI</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {currentUser ? (
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-end">
+                    <span className="text-sm font-medium text-slate-200">
+                      {currentUser.full_name || currentUser.username || currentUser.email || 'Người dùng'}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {currentUser.phone_verified ? 'SĐT đã xác thực' : 'Chưa xác thực'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="px-4 py-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-4 py-2 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors bg-violet-500/10 hover:bg-violet-500/20 rounded-lg"
+                >
+                  Đăng nhập Google
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <DashboardContent 
+          selectedTicker={selectedTicker} 
+          setSelectedTicker={setSelectedTicker}
+          timeframe={timeframe} 
+          setTimeframe={setTimeframe}
+          showTickerMenu={showTickerMenu}
+          setShowTickerMenu={setShowTickerMenu}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Separate component for dashboard content to avoid re-renders
+function DashboardContent({
+  selectedTicker,
+  setSelectedTicker,
+  timeframe,
+  setTimeframe,
+  showTickerMenu,
+  setShowTickerMenu
+}: {
+  selectedTicker: string;
+  setSelectedTicker: (ticker: string) => void;
+  timeframe: string;
+  setTimeframe: (tf: string) => void;
+  showTickerMenu: boolean;
+  setShowTickerMenu: (show: boolean) => void;
+}) {
   return (
     <div className="w-full h-full flex flex-col">
       {/* Dashboard Header */}
