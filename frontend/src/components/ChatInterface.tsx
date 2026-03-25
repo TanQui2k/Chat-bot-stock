@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 type Message = {
   id: string;
@@ -9,6 +10,7 @@ type Message = {
 };
 
 export default function ChatInterface() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -43,17 +45,17 @@ export default function ChatInterface() {
   const initSession = async () => {
     setIsInitializing(true);
     try {
-      const userId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+      const userId = user?.id || (typeof crypto !== 'undefined' && crypto.randomUUID 
           ? crypto.randomUUID() 
-          : '123e4567-e89b-12d3-a456-426614174000'.replace(/[xy]/g, function(c) {
-              var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-              return v.toString(16);
-            });
+          : '123e4567-e89b-12d3-a456-426614174000');
       
       const res = await fetch('http://localhost:8000/api/chat/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: 'Phiên Chat Giao Diện' })
+        body: JSON.stringify({ 
+          user_id: userId, 
+          title: `Phiên Chat ${new Date().toLocaleDateString()}` 
+        })
       });
       const data = await res.json();
       if (data.id) setSessionId(data.id);
@@ -66,7 +68,7 @@ export default function ChatInterface() {
 
   useEffect(() => {
     initSession();
-  }, []);
+  }, [user?.id]); // Re-init when user changes (e.g. login)
 
   const quickActions = [
     { icon: '💰', text: 'Giá FPT hiện tại', action: 'Giá FPT hiện tại là bao nhiêu?' },
@@ -110,7 +112,6 @@ export default function ChatInterface() {
     setIsLoading(true);
 
     try {
-      // Gọi Endpoint thật trên Backend: POST /sessions/{id}/turn
       const res = await fetch(`http://localhost:8000/api/chat/sessions/${sessionId}/turn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +120,6 @@ export default function ChatInterface() {
       
       if (!res.ok) throw new Error("Backend API gặp lỗi hoặc chưa phản hồi.");
       
-      // Parse payload trả về (ChatTurnResponse chứa assistant_message)
       const turnResponse = await res.json();
       const assistantText = turnResponse.assistant_message.content;
       
@@ -207,8 +207,12 @@ export default function ChatInterface() {
                 AI
               </div>
             ) : (
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-lg text-xs font-bold text-white uppercase">
-                VA
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 shadow-lg border border-slate-700 overflow-hidden shadow-indigo-500/20">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="User Avatar" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-white font-bold text-xs">{(user?.full_name || user?.username || "U").substring(0, 2).toUpperCase()}</span>
+                )}
               </div>
             )}
             <div className={`rounded-2xl p-3.5 text-sm shadow-sm border leading-relaxed whitespace-pre-wrap ${

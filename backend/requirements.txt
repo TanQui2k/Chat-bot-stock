@@ -12,4 +12,6 @@ vnstock
 pandas
 joblib
 scikit-learn
+python-jose[cryptography]
+python-multipart
 

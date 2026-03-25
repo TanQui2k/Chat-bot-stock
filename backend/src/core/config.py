@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_BASE_URL: str | None = None
+
+    # Security
+    SECRET_KEY: str = "your-secret-key-here-change-in-production"
     
     model_config = SettingsConfigDict(
         env_file=".env",

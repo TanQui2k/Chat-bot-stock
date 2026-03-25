@@ -9,7 +9,7 @@ from src.crud import crud_user
 from src.core.security import (
     create_user_token, verify_password, get_password_hash
 )
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -143,7 +143,7 @@ def google_login(
 @router.post("/google/link")
 def link_google_account(
     request: schemas.GoogleLoginRequest,
-    current_user: schemas.User = Depends(get_db),  # Requires authentication
+    current_user: schemas.User = Depends(get_current_user),  # Requires authentication
     db: Session = Depends(get_db)
 ):
     """Link Google account to existing user."""

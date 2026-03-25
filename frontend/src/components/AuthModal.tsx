@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { authApi, AuthUser } from "@/lib/api";
+import { authApi, AuthUser, AuthResponse } from "@/lib/api";
 
 // Google OAuth button component
 const GoogleButton: React.FC<{ 
@@ -41,7 +41,7 @@ const GoogleButton: React.FC<{
 
 // Phone login form
 const PhoneLoginForm: React.FC<{
-  onSuccess: (user: AuthUser) => void;
+  onSuccess: (response: AuthResponse) => void;
   onSwitchToLogin: () => void;
 }> = ({ onSuccess, onSwitchToLogin }) => {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -103,7 +103,7 @@ const PhoneLoginForm: React.FC<{
 
     try {
       const response = await authApi.verifyPhoneCode(phoneNumber, verificationCode);
-      onSuccess(response.user);
+      onSuccess(response);
     } catch (err: any) {
       setError(err.message || "Mã xác thực không hợp lệ");
     } finally {
@@ -252,7 +252,7 @@ const PhoneLoginForm: React.FC<{
 
 // Password login form
 const PasswordLoginForm: React.FC<{
-  onSuccess: (user: AuthUser) => void;
+  onSuccess: (response: AuthResponse) => void;
   onSwitchToPhone: () => void;
 }> = ({ onSuccess, onSwitchToPhone }) => {
   const [identifier, setIdentifier] = useState("");
@@ -272,7 +272,7 @@ const PasswordLoginForm: React.FC<{
 
     try {
       const response = await authApi.login(identifier, password);
-      onSuccess(response.user);
+      onSuccess(response);
     } catch (err: any) {
       setError(err.message || "Đăng nhập thất bại");
     } finally {
@@ -374,11 +374,42 @@ const PasswordLoginForm: React.FC<{
 };
 
 // Main Auth Modal Component - Simple Google Login Only
+import { useGoogleLogin } from "@react-oauth/google";
+
 export const AuthModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (user: AuthUser) => void;
+  onSuccess: (response: AuthResponse) => void;
 }> = ({ isOpen, onClose, onSuccess }) => {
+  const [authMode, setAuthMode] = useState<"selection" | "phone" | "password">("selection");
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Only initialize Google Login if client ID is provided
+  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  
+  const triggerGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      try {
+        const response = await authApi.googleLogin(tokenResponse.access_token);
+        onSuccess(response);
+      } catch (error: any) {
+        alert("Google Login failed: " + error.message);
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: () => alert("Login Failed"),
+  });
+
+  const handleGoogleClick = () => {
+    if (!GOOGLE_CLIENT_ID) {
+      alert("Chưa cấu hình Google Client ID trong file .env");
+      return;
+    }
+    triggerGoogleLogin();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -420,20 +451,83 @@ export const AuthModal: React.FC<{
           </svg>
         </button>
 
-        {/* Content - Google Login Only */}
-        <div className="p-8 text-center">
-          <p className="text-slate-600 mb-6">
-            Chọn phương thức đăng nhập để tiếp tục
-          </p>
-          <div className="space-y-4">
-            <GoogleButton
-              onClick={() => {
-                // Trigger Google OAuth flow
-                alert("Google OAuth - Cần cấu hình Google Cloud Console");
-              }}
-              isLoading={false}
-            />
-          </div>
+        {/* Content */}
+        <div className="p-8">
+          {authMode === "selection" && (
+            <div className="text-center space-y-6">
+              <p className="text-slate-600">
+                Chọn phương thức đăng nhập để tiếp tục
+              </p>
+              <div className="space-y-4">
+                <GoogleButton
+                  onClick={handleGoogleClick}
+                  isLoading={googleLoading}
+                />
+                
+                <div className="relative flex items-center py-2">
+                  <div className="flex-grow border-t border-slate-200"></div>
+                  <span className="flex-shrink mx-4 text-slate-400 text-xs font-medium uppercase tracking-wider">Hoặc</span>
+                  <div className="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setAuthMode("phone")}
+                    className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-slate-200 hover:border-violet-500 hover:bg-violet-50/50 transition-all group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-violet-100 transition-colors">
+                      <svg className="w-5 h-5 text-slate-500 group-hover:text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600 group-hover:text-violet-700">SMS / OTP</span>
+                  </button>
+
+                  <button
+                    onClick={() => setAuthMode("password")}
+                    className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-slate-200 hover:border-cyan-500 hover:bg-cyan-50/50 transition-all group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-cyan-100 transition-colors">
+                      <svg className="w-5 h-5 text-slate-500 group-hover:text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-600 group-hover:text-cyan-700">Mật khẩu</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {authMode === "phone" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <PhoneLoginForm 
+                onSuccess={onSuccess} 
+                onSwitchToLogin={() => setAuthMode("password")} 
+              />
+              <button 
+                onClick={() => setAuthMode("selection")}
+                className="w-full mt-4 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                ← Quay lại lựa chọn
+              </button>
+            </div>
+          )}
+
+          {authMode === "password" && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <PasswordLoginForm 
+                onSuccess={onSuccess} 
+                onSwitchToPhone={() => setAuthMode("phone")} 
+              />
+              <button 
+                onClick={() => setAuthMode("selection")}
+                className="w-full mt-4 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                ← Quay lại lựa chọn
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

@@ -76,11 +76,28 @@ def create_user_from_google(db: Session, google_info: dict) -> User:
         return existing_email_user
     
     # Create new user
+    full_name = google_info.get("full_name", "")
+    email = google_info.get("email", "")
+    
+    # Derive username from full_name or email prefix
+    if full_name:
+        # Lowercase and remove spaces
+        base_username = re.sub(r'[^a-zA-Z0-9]', '', full_name).lower()
+    else:
+        base_username = email.split("@")[0]
+        
+    # Ensure uniqueness
+    username = base_username
+    counter = 1
+    while db.query(User).filter(User.username == username).first():
+        username = f"{base_username}{counter}"
+        counter += 1
+
     db_user = User(
-        username=google_info.get("email", "").split("@")[0],
-        email=google_info.get("email"),
+        username=username,
+        email=email,
         google_id=google_info.get("google_id"),
-        full_name=google_info.get("full_name"),
+        full_name=full_name,
         avatar_url=google_info.get("avatar_url"),
         phone_verified=True,
         auth_providers=["google"],

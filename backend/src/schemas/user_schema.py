@@ -34,6 +34,8 @@ class UserResponse(UserBase):
     last_login: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
+    
+User = UserResponse
 
 # ==========================================
 # Authentication Schemas
