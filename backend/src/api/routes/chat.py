@@ -14,6 +14,7 @@ from src.schemas.chat_schema import (
 )
 from src.services.vnstock_service import VnStockPriceService
 from src.services.llm_service import LLMService
+from src.utils.helpers import format_context_for_llm
 import re
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -68,18 +69,30 @@ _TICKER_RE = re.compile(r"\b([A-Za-z]{3,5})\b")
 
 
 def _route_intent(user_text: str, *, history: list[dict[str, str]] | None = None) -> str:
+    # Build structured context from helpers
+    structured_context = format_context_for_llm(user_text, history)
+    
     # Price intent
     if _PRICE_KW.search(user_text):
-        return _handle_price_intent(user_text, history=history)
+        return _handle_price_intent(user_text, history=history, structured_context=structured_context)
 
-    # Default: use OpenAI for natural reply, but with no external data.
+    # Default: use OpenAI for natural reply with full structured context.
     try:
-        ans = LLMService().natural_chat_answer(question=user_text, history=history)
+        ans = LLMService().natural_chat_answer(
+            question=user_text,
+            history=history,
+            structured_context=structured_context
+        )
         return ans or "Mình đã nhận câu hỏi của bạn. Bạn có thể hỏi theo dạng: 'Giá FPT bao nhiêu?'."
     except Exception:
         return "Mình đã nhận câu hỏi của bạn. Bạn có thể hỏi theo dạng: 'Giá FPT bao nhiêu?'."
 
-def _handle_price_intent(user_text: str, *, history: list[dict[str, str]] | None = None) -> str:
+def _handle_price_intent(
+    user_text: str, 
+    *, 
+    history: list[dict[str, str]] | None = None,
+    structured_context: str | None = None
+) -> str:
     m = _TICKER_RE.search(user_text)
     if not m:
         return "Bạn cho mình xin mã cổ phiếu (VD: FPT, VCB) để mình báo giá nhé."
@@ -88,15 +101,20 @@ def _handle_price_intent(user_text: str, *, history: list[dict[str, str]] | None
     price_info = VnStockPriceService().get_latest_price(symbol)
 
     try:
-        # Provide a bit of recent history for a more natural reply, but still grounded by context.
+        # Build price context with structured context from ContextBuilder
+        price_context = [
+            f"Mã: {price_info.symbol}",
+            f"Giá: {price_info.price} {price_info.currency}",
+            *( [f"Thời điểm: {price_info.as_of}"] if price_info.as_of else [] ),
+        ]
+        
+        # Combine price context with structured context
+        full_context = price_context + [structured_context] if structured_context else price_context
+        
         return LLMService().natural_chat_answer(
             question=user_text,
             history=history,
-            context=[
-                f"Mã: {price_info.symbol}",
-                f"Giá: {price_info.price} {price_info.currency}",
-                *( [f"Thời điểm: {price_info.as_of}"] if price_info.as_of else [] ),
-            ],
+            context=full_context
         )
     except Exception:
         return f"Giá {price_info.symbol} hiện tại khoảng {price_info.price} {price_info.currency}."

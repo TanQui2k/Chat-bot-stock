@@ -35,10 +35,13 @@ class LLMService:
         question: str,
         history: list[dict[str, str]] | None = None,
         context: list[str] | None = None,
+        structured_context: str | None = None,
     ) -> str | None:
         """
         Generic VN chat answer, with optional recent history + grounding context lines.
         history: list of OpenAI message dicts: {"role": "user"|"assistant", "content": "..."}
+        context: list of plain text context lines
+        structured_context: formatted context string from ContextBuilder (NEW)
         Returns None if OpenAI is not configured.
         """
         if not self._client:
@@ -67,12 +70,33 @@ Bạn phải tuân thủ tuyệt đối quy tắc xưng hô sau dựa trên ngô
 - Nguyên tắc vàng: Tên riêng tiếng Việt KHÔNG xác định được giới tính. Mọi tên đều có thể thuộc bất kỳ giới tính nào. Chỉ dựa vào ĐẠI TỪ khách tự xưng.
 
 # ĐỊNH DẠNG ĐẦU RA (OUTPUT FORMAT)
-Sử dụng gạch đầu dòng hoặc in đậm để làm nổi bật các ý chính. Giữ giọng văn thân thiện, chuyên nghiệp và khách quan."""
+Sử dụng gạch đầu dòng hoặc in đậm để làm nổi bật các ý chính. Giữ giọng văn thân thiện, chuyên nghiệp và khách quan.
 
-        ctx = "\n".join([f"- {x}" for x in (context or [])]).strip()
+# HƯỚNG DẪN SỬ DỤNG NGỮ CẢNH (CONTEXT USAGE)
+- ĐỌC KỸ phần CONTEXT để hiểu ngữ cảnh cuộc trò chuyện
+- Xác định INTENT để biết người dùng đang hỏi gì
+- NHỚ các cổ phiếu đã được đề cập trong lịch sử
+- TÍNH TOÁN dựa trên thông tin được cung cấp
+- TRẢ LỜI ngắn gọn, chính xác, và liên quan đến ngữ cảnh
+- Nếu người dùng hỏi tiếp về một cổ phiếu đã được đề cập, bạn có thể sử dụng ngắn gọn mà không cần nhắc lại mã"""
+
+        # Build context section
+        context_parts = []
+        
+        # Add structured context if available (from ContextBuilder)
+        if structured_context:
+            context_parts.append(structured_context)
+        
+        # Add plain context lines
+        if context:
+            plain_ctx = "\n".join([f"- {x}" for x in context])
+            if plain_ctx:
+                context_parts.append(f"PLAIN CONTEXT:\n{plain_ctx}")
+        
+        # Build user message
         user = f"CÂU HỎI:\n{question}\n"
-        if ctx:
-            user += f"\nCONTEXT:\n{ctx}\n"
+        if context_parts:
+            user += f"\nCONTEXT:\n" + "\n\n".join(context_parts) + "\n"
         user += "\nLUÔN trả lời bằng tiếng Việt CÓ DẤU ĐẦY ĐỦ, ngắn gọn và tự nhiên."
 
         messages: list[dict[str, str]] = [{"role": "system", "content": system}]
@@ -126,4 +150,3 @@ Sử dụng gạch đầu dòng hoặc in đậm để làm nổi bật các ý 
         if not content:
             return f"Giá {symbol} hiện tại khoảng {price} {currency}."
         return content
-

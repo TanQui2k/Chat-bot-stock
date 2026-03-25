@@ -4,6 +4,11 @@ from sqlalchemy.orm import sessionmaker
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    # Server Configuration
+    SERVER_HOST: str = "127.0.0.1"
+    SERVER_PORT: int = 8000
+
+    # Database
     DATABASE_URL: str = "postgresql+psycopg2://postgres:your_password@localhost:5432/stock_db"
 
     # OpenAI

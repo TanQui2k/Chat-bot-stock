@@ -9,4 +9,7 @@ passlib[bcrypt]
 openai
 httpx
 vnstock
+pandas
+joblib
+scikit-learn
 

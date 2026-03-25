@@ -1,9 +1,17 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import InteractiveChart from "../components/InteractiveChart";
 import ChatInterface from "../components/ChatInterface";
 import PredictionWidget from "../components/PredictionWidget";
 
+const popularTickers = ['FPT', 'VNM', 'MSN', 'VPB', 'ACB', 'HPG', 'VIC', 'VCB'];
+
 export default function Dashboard() {
+  const [selectedTicker, setSelectedTicker] = useState('FPT');
+  const [timeframe, setTimeframe] = useState('1M');
+  const [showTickerMenu, setShowTickerMenu] = useState(false);
+  
   return (
     <div className="w-full h-full flex flex-col">
       {/* Dashboard Header */}
@@ -12,12 +20,63 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Tổng quan thị trường</h1>
           <p className="text-sm text-slate-400 mt-1">Phân tích và dự đoán bằng AI theo thời gian thực</p>
         </div>
-        {/* Quick controls mock */}
-        <div className="flex bg-slate-800/80 rounded-lg p-1 border border-slate-700/60 shadow-sm">
-          <button className="px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm transition-colors">1 Ngày</button>
-          <button className="px-4 py-1.5 text-sm font-medium rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors">1 Tuần</button>
-          <button className="px-4 py-1.5 text-sm font-medium rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors">1 Tháng</button>
-          <button className="px-4 py-1.5 text-sm font-medium rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors">1 Năm</button>
+        
+        {/* Improved Filter Controls */}
+        <div className="flex items-center gap-2">
+          {/* Stock Symbol Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTickerMenu(!showTickerMenu)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 hover:border-emerald-500/50 transition-all"
+            >
+              <span className="font-semibold text-emerald-400">{selectedTicker}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-slate-400">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+            </button>
+            
+            {showTickerMenu && (
+              <div className="absolute top-full left-0 mt-1 w-40 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                {popularTickers.map((ticker) => (
+                  <button
+                    key={ticker}
+                    onClick={() => {
+                      setSelectedTicker(ticker);
+                      setShowTickerMenu(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors flex justify-between items-center group"
+                  >
+                    <span>{ticker}</span>
+                    <span className="text-xs text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">Xem</span>
+                  </button>
+                ))}
+                <div className="border-t border-slate-800 pt-1">
+                  <input
+                    type="text"
+                    placeholder="Tìm mã..."
+                    className="w-full px-3 py-2 text-sm bg-slate-800 border-b border-slate-700 focus:outline-none text-slate-200"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Timeframe Selector */}
+          <div className="flex bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/60 shadow-sm">
+            {['1D', '1W', '1M', '3M', '6M', '1Y'].map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  timeframe === tf 
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -26,7 +85,7 @@ export default function Dashboard() {
         
         {/* Left Column: Market Chart (2/3 width on desktop) */}
         <div className="lg:col-span-2 flex flex-col gap-6 min-h-0">
-          <InteractiveChart symbol="FPT" />
+          <InteractiveChart symbol={selectedTicker} />
           
           {/* Sentiment & Quick Insights Widgets */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 shrink-0">
@@ -48,7 +107,7 @@ export default function Dashboard() {
                </div>
             </div>
             
-            <PredictionWidget symbol="FPT" />
+            <PredictionWidget symbol={selectedTicker} />
           </div>
         </div>
 
