@@ -55,6 +55,8 @@ function DashboardContent({
   showTickerMenu: boolean;
   setShowTickerMenu: (show: boolean) => void;
 }) {
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Dashboard Header */}
@@ -124,14 +126,14 @@ function DashboardContent({
       </div>
 
       {/* Main Grid Layout Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 flex-1 min-h-0 relative">
         
-        {/* Left Column: Market Chart (2/3 width on desktop) */}
-        <div className="lg:col-span-2 flex flex-col gap-6 min-h-0">
+        {/* Left Column: Market Chart (8/12 width on desktop) */}
+        <div className="md:col-span-8 flex flex-col gap-6 min-h-0 w-full">
           <InteractiveChart symbol={selectedTicker} />
           
           {/* Sentiment & Quick Insights Widgets */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 shrink-0 pb-20 md:pb-0">
             <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col justify-between h-[150px]">
                <h3 className="text-sm font-semibold text-slate-400 mb-3 flex items-center gap-2">
                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-emerald-500">
@@ -154,10 +156,32 @@ function DashboardContent({
           </div>
         </div>
 
-        {/* Right Column: AI Trading Assistant (1/3 width on desktop) */}
-        <div className="lg:col-span-1 lg:h-[calc(100vh-12rem)] sticky top-24">
+        {/* Right Column: AI Trading Assistant (4/12 width on desktop, hidden on mobile) */}
+        <div className={`md:col-span-4 md:h-[calc(100vh-12rem)] sticky top-24 z-40 transition-transform duration-300 md:block ${isMobileChatOpen ? 'fixed inset-0 top-0 pt-20 p-4 bg-slate-950/90 backdrop-blur-sm shadow-2xl block animate-in slide-in-from-bottom' : 'hidden'}`}>
+          {isMobileChatOpen && (
+            <button 
+              onClick={() => setIsMobileChatOpen(false)}
+              className="md:hidden absolute top-6 right-6 p-2 bg-slate-800 text-slate-300 rounded-full border border-slate-700 z-50 hover:bg-slate-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          )}
           <ChatInterface />
         </div>
+
+        {/* Mobile FAB to open Chat */}
+        {!isMobileChatOpen && (
+          <button 
+            onClick={() => setIsMobileChatOpen(true)}
+            className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-violet-600 shadow-[0_0_20px_rgba(124,58,237,0.5)] rounded-full flex items-center justify-center text-white z-50 hover:bg-violet-500 hover:scale-105 transition-all"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 animate-pulse">
+              <path fillRule="evenodd" d="M4.804 21.644A6.707 6.707 0 006 21.75a6.721 6.721 0 003.583-1.029c.774.182 1.584.279 2.417.279 5.322 0 9.75-3.97 9.75-9 0-5.03-4.428-9-9.75-9s-9.75 3.97-9.75 9c0 2.409 1.025 4.587 2.674 6.192.232.226.277.428.254.543a3.73 3.73 0 01-.814 1.686.75.75 0 00.44 1.223zM8.25 10.875a1.125 1.125 0 100 2.25 1.125 1.125 0 000-2.25zM10.875 12a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0zm4.875-1.125a1.125 1.125 0 100 2.25 1.125 1.125 0 000-2.25z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
 
       </div>
     </div>

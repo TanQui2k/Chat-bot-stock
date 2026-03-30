@@ -182,7 +182,7 @@ export default function ChatInterface() {
         </div>
         
         {/* Quick Actions Bar */}
-        {showQuickActions && (
+        {(showQuickActions || messages.length <= 1) && (
           <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700/50 animate-in fade-in slide-in-from-top-2">
             {quickActions.map((action, index) => (
               <button
@@ -256,7 +256,7 @@ export default function ChatInterface() {
           <button 
             onClick={handleSend}
             disabled={isLoading || !input.trim() || isInitializing}
-            className="absolute right-2 p-1.5 rounded-lg bg-emerald-500 text-slate-900 hover:bg-emerald-400 font-medium text-xs transition-colors disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500"
+            className="absolute right-2 p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500 font-medium text-xs transition-colors disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500"
           >
             Gửi
           </button>

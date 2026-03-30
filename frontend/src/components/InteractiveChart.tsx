@@ -92,13 +92,13 @@ export default function InteractiveChart({ symbol }: { symbol: string }) {
   const rsiLabel = rsi > 70 ? 'Mua quá mức' : rsi < 30 ? 'Bán quá mức' : 'Trung tính';
   
   return (
-    <div className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg relative overflow-hidden flex flex-col min-h-[400px]">
+    <div className="flex-1 bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col min-h-[400px] ring-1 ring-white/5">
       {/* Asset Header Info with Indicators and Controls */}
       <div className="border-b border-slate-800/60 bg-slate-900/50 p-4 shrink-0 flex flex-col gap-3 z-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1">
-            <div className="h-10 w-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-              <span className="text-indigo-400 font-bold text-sm tracking-widest">{symbol}</span>
+            <div className="h-10 w-10 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
+              <span className="text-violet-400 font-bold text-sm tracking-widest">{symbol}</span>
             </div>
             <div className="flex flex-col">
               <h2 className="text-lg font-semibold text-slate-200">Mã Cổ phiếu {symbol}</h2>
@@ -179,10 +179,15 @@ export default function InteractiveChart({ symbol }: { symbol: string }) {
       </div>
 
       {/* Chart Canvas utilizing Recharts */}
-      <div className="p-2 flex-1 flex flex-col relative bg-slate-950/20">
+      <div className="p-2 flex-1 flex flex-col relative bg-transparent">
         {loading ? (
-             <div className="flex items-center justify-center flex-1">
-                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
+             <div className="flex flex-col items-center justify-center flex-1 p-8 space-y-4">
+                 <div className="w-full h-full bg-slate-800/30 rounded-xl animate-pulse flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-500">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
+                      <span className="text-xs font-medium">Đang tải dữ liệu biểu đồ...</span>
+                    </div>
+                 </div>
              </div>
         ) : error ? (
             <div className="flex items-center justify-center flex-1 text-rose-500 text-sm">{error}</div>
@@ -198,8 +203,8 @@ export default function InteractiveChart({ symbol }: { symbol: string }) {
                    </linearGradient>
                    {showIndicators && ma20 && (
                      <linearGradient id="colorMA20" x1="0" y1="0" x2="0" y2="1">
-                       <stop offset="5%" stopColor="#6366f1" stopOpacity={0.5}/>
-                       <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1}/>
+                       <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.5}/>
+                       <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
                      </linearGradient>
                    )}
                    {showIndicators && ma50 && (
@@ -217,9 +222,9 @@ export default function InteractiveChart({ symbol }: { symbol: string }) {
                     domain={['auto', 'auto']}
                     axisLine={false}
                     tickLine={false}
-                 />
+                  />
                  {showIndicators && ma20 && (
-                   <ReferenceLine y={ma20} stroke="#6366f1" strokeDasharray="3 3" label={{ position: 'right', value: 'MA20', fill: '#6366f1', fontSize: 10 }} ifOverflow="extendDomain" />
+                   <ReferenceLine y={ma20} stroke="#8b5cf6" strokeDasharray="3 3" label={{ position: 'right', value: 'MA20', fill: '#8b5cf6', fontSize: 10 }} ifOverflow="extendDomain" />
                  )}
                  {showIndicators && ma50 && (
                    <ReferenceLine y={ma50} stroke="#06b6d4" strokeDasharray="3 3" label={{ position: 'right', value: 'MA50', fill: '#06b6d4', fontSize: 10 }} ifOverflow="extendDomain" />
