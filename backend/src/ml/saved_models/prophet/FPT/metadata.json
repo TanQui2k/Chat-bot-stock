@@ -1,0 +1,21 @@
+{
+  "symbol": "FPT",
+  "trained_at": "2026-04-01T15:13:46.152122",
+  "data_rows": 1126,
+  "date_range": {
+    "start": "2018-12-12",
+    "end": "2026-04-01"
+  },
+  "params": {
+    "changepoint_prior_scale": 0.001,
+    "seasonality_prior_scale": 20.0,
+    "seasonality_mode": "multiplicative",
+    "n_changepoints": 30,
+    "changepoint_range": 0.85
+  },
+  "metrics": {
+    "mae": 13.389,
+    "rmse": 13.9891,
+    "mape": 15.28
+  }
+}

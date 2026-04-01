@@ -1,0 +1,21 @@
+{
+  "symbol": "KBC",
+  "trained_at": "2026-04-01T15:12:20.985892",
+  "data_rows": 1126,
+  "date_range": {
+    "start": "2018-12-12",
+    "end": "2026-04-01"
+  },
+  "params": {
+    "changepoint_prior_scale": 0.001,
+    "seasonality_prior_scale": 20.0,
+    "seasonality_mode": "multiplicative",
+    "n_changepoints": 30,
+    "changepoint_range": 0.85
+  },
+  "metrics": {
+    "mae": 1.9888,
+    "rmse": 2.7099,
+    "mape": 6.34
+  }
+}

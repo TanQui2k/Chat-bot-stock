@@ -27,14 +27,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem("access_token");
-      if (token && token !== "undefined") {
+      if (token && token !== "undefined" && token !== "null") {
         try {
           const profile = await authApi.getProfile(token);
           setUser(profile);
-        } catch (error) {
-          console.error("Failed to load profile", error);
+        } catch (error: any) {
+          // Token is likely expired or invalid - clear it silently during init
           localStorage.removeItem("access_token");
+          // Only log unexpected errors, not simple auth failures
+          if (error.message !== "Invalid token" && error.message !== "Not authenticated") {
+            console.warn("Auth initialization failed:", error.message);
+          }
         }
+      } else {
+        // Clear any messy token strings
+        localStorage.removeItem("access_token");
       }
       setIsLoading(false);
     };

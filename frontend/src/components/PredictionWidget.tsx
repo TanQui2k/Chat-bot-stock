@@ -2,8 +2,24 @@
 
 import React, { useEffect, useState } from 'react';
 
+interface PredictionPoint {
+  date: string;
+  predicted_close: number;
+  lower_bound: number;
+  upper_bound: number;
+  trend: string;
+}
+
+interface PredictionData {
+  symbol: string;
+  version: string;
+  trained_at: string;
+  metrics: { mae?: number; rmse?: number; mape?: number };
+  predictions: PredictionPoint[];
+}
+
 export default function PredictionWidget({ symbol }: { symbol: string }) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<PredictionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
@@ -15,13 +31,10 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
         setLoading(true);
         setError(null);
         
-        // Fetch from the backend predict API
         const response = await fetch('http://localhost:8000/api/predict/', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ ticker: symbol }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker: symbol, days: 10 }),
         });
         
         if (!response.ok) {
@@ -30,9 +43,7 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
         }
         
         const json = await response.json();
-        if (isMounted) {
-          setData(json);
-        }
+        if (isMounted) setData(json);
       } catch (err: any) {
         if (isMounted) setError(err.message);
       } finally {
@@ -47,8 +58,8 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
   if (loading) {
     return (
       <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col justify-center items-center h-full min-h-[140px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500/50"></div>
-        <p className="text-xs text-slate-400 mt-3 font-medium tracking-wide">AI Đang phân tích dữ liệu...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500/50"></div>
+        <p className="text-xs text-slate-400 mt-3 font-medium tracking-wide">Prophet đang phân tích...</p>
       </div>
     );
   }
@@ -56,13 +67,13 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
   if (error || !data) {
     return (
       <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col h-full min-h-[140px] justify-between">
-        <h3 className="text-sm font-semibold text-slate-400 mb-2">Dự đoán AI (24h tới)</h3>
+        <h3 className="text-sm font-semibold text-slate-400 mb-2">Dự báo Prophet (10 phiên)</h3>
         <p className="text-xs text-rose-400/90 flex flex-col gap-1">
            <span className="font-semibold flex items-center gap-1">
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
              </svg>
-             Lỗi tải dữ liệu:
+             Chưa có mô hình:
            </span> 
            <span className="text-[11px] leading-tight break-words line-clamp-2">{error || "Không có kết nối."}</span>
         </p>
@@ -70,69 +81,28 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
     );
   }
 
-  const accuracy = data.confidence_score ? (data.confidence_score * 100).toFixed(1) : "0.0";
-  const predictedClose = data.predicted_close ? data.predicted_close.toLocaleString('vi-VN') : "---";
-  
-  // Logical mapping: generally > 50% on class 1 triggers UP. Since Logistic maps to [0_prob, 1_prob],
-  // confidence >= 50% often means the prediction is confident in its chosen class.
-  // Because our Python API sets confidence_score = max(prob_0, prob_1) essentially, we don't know the exact class just from it.
-  // But wait, the backend predicts trend based on model.predict == 1. 
-  // Let's deduce isUp based on if confidence was mapped. 
-  // For aesthetic simplicity in frontend fallback, we can use the probability score threshold >= 0.5.
-  const isUp = typeof data.confidence_score === 'number' ? data.confidence_score >= 0.50 : true;
-  
-  // Generate prediction reasons based on data and typical factors
-  const generateReasons = () => {
-    const reasons = [];
-    
-    // Add volume-related reason if available
-    if (data.volume && data.volume > 1000000) {
-      reasons.push({ icon: '📊', text: 'Volume giao dịch tăng cao' });
-    }
-    
-    // Add trend-related reason
-    if (isUp) {
-      reasons.push({ icon: '📈', text: 'Xu hướng tăng trong phiên gần đây' });
-      reasons.push({ icon: '🌟', text: 'Momentum tích cực từ thị trường' });
-    } else {
-      reasons.push({ icon: '📉', text: 'Xu hướng giảm trong phiên gần đây' });
-      reasons.push({ icon: '⚠️', text: 'Áp lực bán từ nhà đầu tư' });
-    }
-    
-    // Add technical indicator reason
-    if (data.rsi) {
-      if (data.rsi > 70) reasons.push({ icon: '🔴', text: 'Chỉ số RSI cho vùng mua quá mức' });
-      else if (data.rsi < 30) reasons.push({ icon: '🟢', text: 'Chỉ số RSI cho vùng bán quá mức' });
-    }
-    
-    // Add general analysis reason
-    reasons.push({ icon: '🤖', text: 'Dự đoán dựa trên phân tích lịch sử' });
-    
-    return reasons;
-  };
-  
-  const reasons = generateReasons();
+  const preds = data.predictions;
+  const firstPred = preds[0];
+  const lastPred = preds[preds.length - 1];
+  const isUp = lastPred.predicted_close >= firstPred.predicted_close;
+  const changePercent = ((lastPred.predicted_close - firstPred.predicted_close) / firstPred.predicted_close * 100);
+  const mape = data.metrics?.mape;
+  const confidence = mape != null ? Math.max(0, Math.min(100, 100 - mape)) : null;
 
   return (
     <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5 shadow-md flex flex-col justify-between h-full relative overflow-hidden group hover:border-slate-600 transition-colors">
        <div className="flex items-center justify-between mb-3">
          <h3 className="text-sm font-semibold text-slate-400 flex items-center gap-2">
-           {isUp ? (
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-emerald-500">
-               <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clipRule="evenodd" />
-             </svg>
-           ) : (
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-rose-500">
-               <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM11.25 18a.75.75 0 001.5 0v-6c0-.414-.336-.75-.75-.75h-4.5a.75.75 0 000 1.5h3.75V18z" clipRule="evenodd" />
-             </svg>
-           )}
-           Mô hình ML Dự đoán (24h tới)
+           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-amber-500">
+             <path fillRule="evenodd" d="M12.577 4.878a.75.75 0 01.919-.53l4.78 1.281a.75.75 0 01.531.919l-1.281 4.78a.75.75 0 01-1.449-.387l.81-3.022a19.407 19.407 0 00-5.594 5.203.75.75 0 01-1.139.093L7 10.06l-4.72 4.72a.75.75 0 01-1.06-1.06l5.25-5.25a.75.75 0 011.06 0l3.074 3.073a20.923 20.923 0 015.545-4.931l-3.042.815a.75.75 0 01-.53-.919z" clipRule="evenodd" />
+           </svg>
+           Dự báo Prophet (10 phiên)
          </h3>
          <button 
            onClick={() => setShowMore(!showMore)}
-           className="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 transition-colors"
+           className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 transition-colors"
          >
-           {showMore ? 'Thu gọn' : 'Xem chi tiết'}
+           {showMore ? 'Thu gọn' : 'Chi tiết'}
            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3.5 h-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`}>
              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
            </svg>
@@ -142,53 +112,98 @@ export default function PredictionWidget({ symbol }: { symbol: string }) {
        <div className="z-10 relative space-y-3">
          <div className="flex items-end gap-3 mb-1">
            <div className={`text-3xl font-bold ${isUp ? 'text-emerald-400' : 'text-rose-400'}`}>
-             {isUp ? 'TĂNG GIÁ' : 'GIẢM GIÁ'}
+             {isUp ? 'TĂNG' : 'GIẢM'}
            </div>
-           <div className="text-sm text-slate-400 font-medium mb-1 tracking-tight">Mục tiêu: {predictedClose} ₫</div>
+           <div className={`text-sm font-medium mb-1 tracking-tight ${isUp ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
+             {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
+           </div>
          </div>
 
-         <div className="flex justify-between items-center mb-1">
-            <p className="text-xs text-slate-500">Độ tin cậy của thuật toán</p>
-            <span className="text-xs font-bold text-slate-300">{accuracy}%</span>
+         {/* Mini sparkline of predictions */}
+         <div className="flex items-end gap-[2px] h-8">
+           {preds.map((p, i) => {
+             const min = Math.min(...preds.map(x => x.predicted_close));
+             const max = Math.max(...preds.map(x => x.predicted_close));
+             const range = max - min || 1;
+             const height = ((p.predicted_close - min) / range) * 100;
+             return (
+               <div
+                 key={i}
+                 className={`flex-1 rounded-t-sm transition-all ${
+                   p.trend === 'UP' ? 'bg-emerald-500/60' : 'bg-rose-500/60'
+                 }`}
+                 style={{ height: `${Math.max(10, height)}%` }}
+                 title={`${new Date(p.date).toLocaleDateString('vi-VN')}: ${p.predicted_close.toLocaleString('vi-VN')} ₫`}
+               />
+             );
+           })}
          </div>
-         
-         <div className="w-full bg-slate-900 rounded-full h-1.5">
-             <div className={`h-1.5 rounded-full transition-all duration-1000 ${isUp ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} style={{width: `${accuracy}%`}}></div>
+
+         <div className="flex justify-between items-center text-[10px] text-slate-500">
+           <span>{new Date(firstPred.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+           <span>→</span>
+           <span>{new Date(lastPred.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
          </div>
+
+         {confidence != null && (
+           <>
+             <div className="flex justify-between items-center">
+                <p className="text-xs text-slate-500">Độ chính xác (100 - MAPE)</p>
+                <span className="text-xs font-bold text-slate-300">{confidence.toFixed(1)}%</span>
+             </div>
+             <div className="w-full bg-slate-900 rounded-full h-1.5">
+                 <div className={`h-1.5 rounded-full transition-all duration-1000 ${confidence > 90 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : confidence > 80 ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} style={{width: `${confidence}%`}}></div>
+             </div>
+           </>
+         )}
        </div>
 
-       {/* Prediction Reasons - Collapsible */}
+       {/* Detailed predictions table */}
        {showMore && (
          <div className="mt-4 pt-4 border-t border-slate-700/50">
-           <h4 className="text-xs font-semibold text-slate-400 mb-3 flex items-center gap-2">
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-             </svg>
-             Lý do dự đoán
-           </h4>
-           <div className="space-y-2">
-             {reasons.map((reason, index) => (
-               <div key={index} className="flex items-start gap-2 text-xs text-slate-400">
-                 <span className="shrink-0 mt-0.5">{reason.icon}</span>
-                 <span className="leading-relaxed">{reason.text}</span>
+           <div className="space-y-1.5 max-h-48 overflow-y-auto">
+             {preds.map((p, i) => (
+               <div key={i} className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-700/20 transition-colors">
+                 <span className="text-slate-400 font-medium w-16">
+                   {new Date(p.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                 </span>
+                 <span className={`font-bold ${p.trend === 'UP' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                   {p.predicted_close.toLocaleString('vi-VN')} ₫
+                 </span>
+                 <span className="text-slate-500 text-[10px] w-28 text-right">
+                   {p.lower_bound.toLocaleString('vi-VN')} – {p.upper_bound.toLocaleString('vi-VN')}
+                 </span>
+                 <span className={`text-[10px] font-bold ${p.trend === 'UP' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                   {p.trend === 'UP' ? '▲' : '▼'}
+                 </span>
                </div>
              ))}
            </div>
+           {data.metrics && (
+             <div className="mt-3 pt-3 border-t border-slate-700/30 grid grid-cols-3 gap-2 text-[10px]">
+               <div className="text-center">
+                 <span className="text-slate-500 block">MAE</span>
+                 <span className="text-slate-300 font-bold">{data.metrics.mae?.toFixed(4) || '-'}</span>
+               </div>
+               <div className="text-center">
+                 <span className="text-slate-500 block">RMSE</span>
+                 <span className="text-slate-300 font-bold">{data.metrics.rmse?.toFixed(4) || '-'}</span>
+               </div>
+               <div className="text-center">
+                 <span className="text-slate-500 block">MAPE</span>
+                 <span className="text-slate-300 font-bold">{data.metrics.mape?.toFixed(2) || '-'}%</span>
+               </div>
+             </div>
+           )}
          </div>
        )}
 
        <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
-         <span>Dữ liệu cập nhật: Hôm nay</span>
-         <button 
-           className="hover:text-emerald-400 transition-colors flex items-center gap-1"
-           title="Chia sẻ dự đoán"
-           onClick={() => alert('Chức năng chia sẻ sẽ sớm được cập nhật!')}
-         >
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
-             <path d="M15 8a3 3 0 10-2.977-2.83l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
-           </svg>
-           Chia sẻ
-         </button>
+         <span>Model: {data.version}</span>
+         <span className="flex items-center gap-1">
+           <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+           Prophet Forecast
+         </span>
        </div>
 
        {/* Decorative gradient overlay */}
