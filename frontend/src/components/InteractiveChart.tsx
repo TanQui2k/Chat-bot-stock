@@ -299,8 +299,8 @@ export default function InteractiveChart({
   };
 
   return (
-    <div className="flex-1 bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col min-h-[400px] ring-1 ring-white/5">
-      <div className="border-b border-slate-800/60 bg-slate-900/50 p-4 shrink-0 flex flex-col gap-3 z-20">
+    <div className="h-full bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col min-h-[700px] ring-1 ring-white/5">
+      <div className="border-b border-slate-800/60 bg-slate-900/50 p-5 shrink-0 flex flex-col gap-3 z-20">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1">
             <div className="relative">
@@ -401,7 +401,7 @@ export default function InteractiveChart({
               Indicators
             </button>
             <div className="flex bg-slate-800/50 rounded-lg p-0.5 border border-slate-700">
-              {['1D', '1W', '1M', '3M', '6M', '1Y'].map((tf) => (
+              {['1D', '1W', '1M', '1Y'].map((tf) => (
                 <button
                   key={tf}
                   onClick={() => setTimeframe(tf)}

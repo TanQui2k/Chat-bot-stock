@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
+import { QueryProvider } from "@/services/QueryProvider";
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin", "vietnamese"],
@@ -22,15 +24,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="dark" suppressHydrationWarning={true}>
-      <body suppressHydrationWarning={true} className={`${inter.className} antialiased min-h-screen bg-slate-950 text-slate-50 flex flex-col`}>
-        <AuthProvider>
-          <Navbar />
+      <body suppressHydrationWarning={true} className={`${inter.className} antialiased min-h-screen bg-[#020617] text-slate-100 flex flex-col`}>
+        <QueryProvider>
+          <AuthProvider>
+            <Navbar />
+            <Toaster position="top-right" richColors closeButton />
 
-          {/* Main Content Container */}
-          <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
-            {children}
-          </main>
-        </AuthProvider>
+            {/* Main Content Container with safe height */}
+            <main className="flex-1 w-full px-4 sm:px-6 lg:px-10 py-4 flex flex-col min-h-0">
+              {children}
+            </main>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

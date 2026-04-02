@@ -1,0 +1,21 @@
+{
+  "symbol": "HPG",
+  "trained_at": "2026-04-01T22:51:28.886437",
+  "data_rows": 1050,
+  "date_range": {
+    "start": "2018-12-12",
+    "end": "2025-12-31"
+  },
+  "params": {
+    "changepoint_prior_scale": 0.001,
+    "seasonality_prior_scale": 20.0,
+    "seasonality_mode": "multiplicative",
+    "n_changepoints": 30,
+    "changepoint_range": 0.85
+  },
+  "metrics": {
+    "mae": 0.909,
+    "rmse": 1.068,
+    "mape": 3.4
+  }
+}

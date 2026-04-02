@@ -146,7 +146,7 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="bg-slate-800/90 border border-slate-700 rounded-2xl shadow-xl h-full flex flex-col min-h-[500px]">
+    <div className="bg-slate-800/90 border border-slate-700 rounded-2xl shadow-xl h-full flex flex-col ring-1 ring-white/5 overflow-hidden">
       {/* Chat Header */}
       <div className="border-b border-slate-700/80 p-4 shrink-0 flex flex-col gap-3 bg-slate-800/40 rounded-t-2xl">
         <div className="flex items-center justify-between">
@@ -155,7 +155,7 @@ export default function ChatInterface() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
             </span>
-            <h2 className="text-base font-semibold text-slate-200">Trợ lý Tương tác AI</h2>
+            <h2 className="text-lg font-bold text-slate-100 italic tracking-wide">Trợ lý Tương tác AI</h2>
           </div>
           
           <div className="flex items-center gap-1">
@@ -188,9 +188,9 @@ export default function ChatInterface() {
               <button
                 key={index}
                 onClick={() => handleQuickAction(action.action)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-700/50 hover:bg-emerald-500/20 hover:text-emerald-400 border border-slate-600/50 hover:border-emerald-500/30 transition-all text-xs font-medium"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-700/50 hover:bg-emerald-500/20 hover:text-emerald-400 border border-slate-600/50 hover:border-emerald-500/30 transition-all text-sm font-medium"
               >
-                <span>{action.icon}</span>
+                <span className="text-base">{action.icon}</span>
                 <span>{action.text}</span>
               </button>
             ))}
@@ -215,9 +215,9 @@ export default function ChatInterface() {
                 )}
               </div>
             )}
-            <div className={`rounded-2xl p-3.5 text-sm shadow-sm border leading-relaxed whitespace-pre-wrap ${
+            <div className={`rounded-2xl p-4 text-base shadow-md border leading-relaxed tracking-tight whitespace-pre-wrap ${
               msg.role === 'user' 
-                ? 'bg-emerald-600/20 rounded-tr-sm text-emerald-50 border-emerald-500/30' 
+                ? 'bg-emerald-600/20 rounded-tr-sm text-emerald-50 border-emerald-500/30 font-medium' 
                 : 'bg-slate-700/50 rounded-tl-sm text-slate-200 border-slate-600/50'
             }`}>
               {msg.content}
@@ -251,12 +251,12 @@ export default function ChatInterface() {
             onKeyDown={handleKeyDown}
             placeholder={isInitializing ? "Đang kết nối Backend..." : "Nhắn tin cho AI..."} 
             disabled={isInitializing || isLoading}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-16 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-all shadow-inner disabled:opacity-50"
+            className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-5 pr-20 py-4 text-base text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-all shadow-inner disabled:opacity-50"
           />
           <button 
             onClick={handleSend}
             disabled={isLoading || !input.trim() || isInitializing}
-            className="absolute right-2 p-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500 font-medium text-xs transition-colors disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500"
+            className="absolute right-3 px-4 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-500 font-bold text-sm transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-500"
           >
             Gửi
           </button>
