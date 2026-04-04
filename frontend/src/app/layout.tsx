@@ -17,25 +17,29 @@ export const metadata: Metadata = {
   authors: [{ name: "StockAI Team" }],
 };
 
+import { ThemeProvider } from "@/context/ThemeContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="dark" suppressHydrationWarning={true}>
-      <body suppressHydrationWarning={true} className={`${inter.className} antialiased min-h-screen bg-[#020617] text-slate-100 flex flex-col`}>
-        <QueryProvider>
-          <AuthProvider>
-            <Navbar />
-            <Toaster position="top-right" richColors closeButton />
+    <html lang="vi" suppressHydrationWarning={true}>
+      <body suppressHydrationWarning={true} className={`${inter.className} antialiased h-screen overflow-hidden bg-background text-foreground flex flex-col transition-colors duration-300`}>
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <Navbar />
+              <Toaster position="top-right" richColors closeButton />
 
-            {/* Main Content Container with safe height */}
-            <main className="flex-1 w-full px-4 sm:px-6 lg:px-10 py-4 flex flex-col min-h-0">
-              {children}
-            </main>
-          </AuthProvider>
-        </QueryProvider>
+              {/* Main Content Container - Fixed Height, No Scroll */}
+              <main className="flex-1 w-full flex flex-col min-h-0 overflow-hidden">
+                {children}
+              </main>
+            </AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
