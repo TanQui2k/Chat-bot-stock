@@ -73,21 +73,22 @@ def create_user_from_google(db: Session, google_info: dict) -> User:
         return existing_user
     
     # Check if user exists by email
-    existing_email_user = get_user_by_email(db, google_info.get("email"))
-    if existing_email_user:
-        # Link Google account to existing user
-        existing_email_user.google_id = google_info.get("google_id")
-        existing_email_user.auth_providers = list(set(existing_email_user.auth_providers or []) | {"google"})
-        existing_email_user.full_name = google_info.get("full_name")
-        existing_email_user.avatar_url = google_info.get("avatar_url")
-        existing_email_user.last_login = datetime.now()
-        db.commit()
-        db.refresh(existing_email_user)
-        return existing_email_user
+    email = google_info.get("email", "").lower().strip()
+    if email:
+        existing_email_user = get_user_by_email(db, email)
+        if existing_email_user:
+            # Link Google account to existing user
+            existing_email_user.google_id = google_info.get("google_id")
+            existing_email_user.auth_providers = list(set(existing_email_user.auth_providers or []) | {"google"})
+            existing_email_user.full_name = google_info.get("full_name")
+            existing_email_user.avatar_url = google_info.get("avatar_url")
+            existing_email_user.last_login = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(existing_email_user)
+            return existing_email_user
     
     # Create new user
     full_name = google_info.get("full_name", "")
-    email = google_info.get("email", "")
     
     # Derive username from full_name or email prefix
     if full_name:

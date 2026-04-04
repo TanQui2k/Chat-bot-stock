@@ -21,13 +21,20 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 # Helpers
 def set_auth_cookie(response: JSONResponse, token: str):
+    """Set HttpOnly Secure cookie for authentication."""
+    # Production should set SECURE=true, for localhost it must be False (unless HTTPS)
+    is_production = os.environ.get("ENVIRONMENT", "development").lower() == "production"
+    
+    # Use expiration from settings (minutes to seconds)
+    max_age_seconds = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,  # Set to True in production
-        samesite="strict",
-        max_age=60 * 24 * 60  # 24 hours
+        secure=is_production, 
+        samesite="lax" if is_production else "lax", # 'strict' can break some navigations, 'lax' is generally safer for first-party
+        max_age=max_age_seconds
     )
 
 # ==========================================
@@ -58,7 +65,8 @@ def send_phone_verification_code(
     verification = crud_user.create_phone_verification(db, request.phone_number)
     
     # [DEV] Log code to console
-    logger.info(f"[DEV] OTP for {request.phone_number}: {verification.verification_code}")
+    if os.environ.get("ENVIRONMENT") != "production":
+        logger.info(f"[DEV] OTP for {request.phone_number}: {verification.verification_code}")
     
     return {
         "message": "Verification code sent successfully",
@@ -132,17 +140,24 @@ def register(
     db: Session = Depends(get_db)
 ):
     """Register a new user with email and password."""
+    # Email normalization
+    email = request.email.lower().strip()
+    
     # Check if user already exists
-    existing_user = crud_user.get_user_by_email(db, request.email)
+    existing_user = crud_user.get_user_by_email(db, email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    user = crud_user.create_user(
-        db, 
-        email=request.email, 
-        password=request.password, 
-        full_name=request.full_name
-    )
+    try:
+        user = crud_user.create_user(
+            db, 
+            email=email, 
+            password=request.password, 
+            full_name=request.full_name
+        )
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create user")
     
     token = create_user_token(user_id=str(user.id), auth_method="password")
     
@@ -160,7 +175,10 @@ def login(
     db: Session = Depends(get_db)
 ):
     """Login with email/phone and password."""
-    user = crud_user.verify_password_login(db, request.identifier, request.password)
+    # Normalization if it looks like an email
+    identifier = request.identifier.lower().strip() if "@" in request.identifier else request.identifier.strip()
+    
+    user = crud_user.verify_password_login(db, identifier, request.password)
     
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
