@@ -58,11 +58,16 @@ class PhoneVerificationVerify(BaseModel):
     verification_code: str
 
 class GoogleLoginRequest(BaseModel):
-    id_token: str
+    access_token: str = Field(..., description="Google OAuth2 access token from frontend")
 
 class LoginRequest(BaseModel):
     identifier: str = Field(..., description="Username, email, or phone number")
     password: str
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: Optional[str] = None
 
 class LoginResponse(BaseModel):
     access_token: str

@@ -1,19 +1,19 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { authApi, AuthUser } from "@/lib/api";
+import { authApi, AuthUser, AuthResponse } from "@/lib/api";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (response: any) => void;
+  login: (response: AuthResponse) => void;
   logout: () => void;
   showAuthModal: () => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (isOpen: boolean) => void;
 }
 
-import { GoogleOAuthProvider } from "@react-oauth/google";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
@@ -26,46 +26,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem("access_token");
-      if (token && token !== "undefined" && token !== "null") {
-        try {
-          const profile = await authApi.getProfile(token);
-          setUser(profile);
-        } catch (error: any) {
-          // Token is likely expired or invalid - clear it silently during init
-          localStorage.removeItem("access_token");
-          // Only log unexpected errors, not simple auth failures
-          if (error.message !== "Invalid token" && error.message !== "Not authenticated") {
-            console.warn("Auth initialization failed:", error.message);
-          }
-        }
-      } else {
-        // Clear any messy token strings
-        localStorage.removeItem("access_token");
+      try {
+        const profile = await authApi.getProfile();
+        setUser(profile);
+      } catch (error: unknown) {
+        // Not logged in or session expired - silent failure during init
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     initAuth();
   }, []);
 
-  const login = (response: any) => {
+  const login = (response: AuthResponse) => {
     setUser(response.user);
-    localStorage.setItem("access_token", response.access_token);
     setIsAuthModalOpen(false);
   };
 
   const logout = async () => {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      try {
-        await authApi.logout(token);
-      } catch (e) {
-        console.error("Logout API error", e);
-      }
+    try {
+      await authApi.logout();
+    } catch (e) {
+      console.error("Logout API error", e);
+    } finally {
+      setUser(null);
     }
-    setUser(null);
-    localStorage.removeItem("access_token");
   };
 
   const showAuthModal = () => setIsAuthModalOpen(true);

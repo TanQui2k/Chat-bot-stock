@@ -1,0 +1,21 @@
+{
+  "symbol": "VNM",
+  "trained_at": "2026-04-04T08:30:38.127471",
+  "data_rows": 1300,
+  "date_range": {
+    "start": "2017-12-13",
+    "end": "2025-12-31"
+  },
+  "params": {
+    "changepoint_prior_scale": 0.001,
+    "seasonality_prior_scale": 20.0,
+    "seasonality_mode": "multiplicative",
+    "n_changepoints": 30,
+    "changepoint_range": 0.85
+  },
+  "metrics": {
+    "mae": 6.9725,
+    "rmse": 7.4324,
+    "mape": 11.34
+  }
+}

@@ -57,11 +57,12 @@ export interface AuthMethods {
 // Auth API
 export const authApi = {
   // Phone Authentication
-  sendPhoneCode: async (phone: string): Promise<{ message: string; code: string }> => {
+  sendPhoneCode: async (phone: string): Promise<{ message: string; expires_in: number }> => {
     const response = await fetch(`${API_BASE_URL}/auth/phone/send-code`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone_number: phone }),
+      credentials: "include",
     });
     
     const data = await response.json();
@@ -82,6 +83,7 @@ export const authApi = {
         phone_number: phone,
         verification_code: code,
       }),
+      credentials: "include",
     });
 
     const data = await response.json();
@@ -96,12 +98,32 @@ export const authApi = {
     const response = await fetch(`${API_BASE_URL}/auth/google/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_token: idToken }),
+      body: JSON.stringify({ access_token: idToken }),
+      credentials: "include",
     });
 
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.detail || "Google login failed");
+    }
+    return data;
+  },
+
+  register: async (
+    email: string,
+    password: string,
+    fullName?: string
+  ): Promise<AuthResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, full_name: fullName }),
+      credentials: "include",
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || "Registration failed");
     }
     return data;
   },
@@ -115,6 +137,7 @@ export const authApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identifier, password }),
+      credentials: "include",
     });
 
     const data = await response.json();
@@ -125,13 +148,13 @@ export const authApi = {
   },
 
   // Profile
-  getProfile: async (token: string): Promise<AuthUser> => {
+  getProfile: async (): Promise<AuthUser> => {
     const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
+      credentials: "include",
     });
 
     const data = await response.json();
@@ -141,13 +164,13 @@ export const authApi = {
     return data;
   },
 
-  getAuthMethods: async (token: string): Promise<AuthMethods> => {
+  getAuthMethods: async (): Promise<AuthMethods> => {
     const response = await fetch(`${API_BASE_URL}/auth/auth-methods`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
+      credentials: "include",
     });
 
     const data = await response.json();
@@ -158,13 +181,13 @@ export const authApi = {
   },
 
   // Logout
-  logout: async (token: string): Promise<{ message: string }> => {
+  logout: async (): Promise<{ message: string }> => {
     const response = await fetch(`${API_BASE_URL}/auth/logout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
+      credentials: "include",
     });
 
     const data = await response.json();

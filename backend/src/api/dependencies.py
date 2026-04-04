@@ -36,6 +36,11 @@ async def get_current_user(
         if payload is None:
             raise HTTPException(status_code=401, detail="Invalid token")
         
+        # Check if token has been blacklisted (user logged out)
+        from src.services.token_blacklist import is_token_blacklisted
+        if is_token_blacklisted(token):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+        
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
@@ -70,6 +75,11 @@ async def get_optional_user(
         
         payload = verify_token(token)
         if payload is None:
+            return None
+        
+        # Check blacklist
+        from src.services.token_blacklist import is_token_blacklisted
+        if is_token_blacklisted(token):
             return None
         
         user_id = payload.get("sub")

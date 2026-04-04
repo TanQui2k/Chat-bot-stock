@@ -1,8 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Shared phone validation pattern
+PHONE_PATTERN = re.compile(r'^(\+84|0|84)[0-9]{9,10}$')
 
 from src import schemas
 from src.crud import crud_user
@@ -12,6 +18,17 @@ from src.core.security import (
 from src.api.dependencies import get_db, get_current_user
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+
+# Helpers
+def set_auth_cookie(response: JSONResponse, token: str):
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=True,  # Set to True in production
+        samesite="strict",
+        max_age=60 * 24 * 60  # 24 hours
+    )
 
 # ==========================================
 # Phone Authentication
@@ -23,8 +40,7 @@ def send_phone_verification_code(
     db: Session = Depends(get_db)
 ):
     """Send verification code to phone number."""
-    phone_pattern = r'^(\+84|0|84)[0-9]{9,10}$'
-    if not re.match(phone_pattern, request.phone_number):
+    if not PHONE_PATTERN.match(request.phone_number):
         raise HTTPException(
             status_code=400,
             detail="Invalid phone number format. Use: +84xxxxxxxxx or 0xxxxxxxxx"
@@ -41,14 +57,13 @@ def send_phone_verification_code(
     # Create verification record
     verification = crud_user.create_phone_verification(db, request.phone_number)
     
-    # TODO: Send SMS with verification code
-    # For demo: return code in response
-    # In production: use SMS gateway (Twilio, msg91, or local provider)
+    # [DEV] Log code to console
+    logger.info(f"[DEV] OTP for {request.phone_number}: {verification.verification_code}")
+    
     return {
         "message": "Verification code sent successfully",
         "phone_number": request.phone_number,
-        "code": verification.verification_code,  # For demo only!
-        "expires_in": 600  # 10 minutes in seconds
+        "expires_in": 600
     }
 
 @router.post("/phone/verify")
@@ -57,127 +72,87 @@ def verify_phone_code(
     db: Session = Depends(get_db)
 ):
     """Verify phone code and login/create user."""
-    # Verify code
     is_valid = crud_user.verify_phone_code(db, request.phone_number, request.verification_code)
     
     if not is_valid:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or expired verification code"
-        )
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
     
-    # Get or create user
     user = crud_user.create_user_from_phone(db, request.phone_number, {
-        "username": request.phone_number,
-        "email": None,
-        "full_name": None
+        "username": request.phone_number
     })
     
-    # Create token
-    token = create_user_token(
-        user_id=str(user.id),
-        auth_method="phone",
-        phone_verified=True
-    )
+    token = create_user_token(user_id=str(user.id), auth_method="phone", phone_verified=True)
     
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": schemas.UserResponse.model_validate(user)
-    }
-
-@router.post("/phone/verify-only")
-def verify_phone_code_only(
-    request: schemas.PhoneVerificationVerify,
-    db: Session = Depends(get_db)
-):
-    """Verify phone code only (for updating existing user)."""
-    is_valid = crud_user.verify_phone_code(db, request.phone_number, request.verification_code)
-    
-    if not is_valid:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid or expired verification code"
-        )
-    
-    return {"message": "Phone number verified successfully"}
+    response = JSONResponse(content={
+        "message": "Login successful",
+        "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
+    })
+    set_auth_cookie(response, token)
+    return response
 
 # ==========================================
 # Google OAuth Authentication
 # ==========================================
 
 @router.post("/google/login")
-def google_login(
+async def google_login(
     request: schemas.GoogleLoginRequest,
     db: Session = Depends(get_db)
 ):
-    """Login with Google OAuth ID token."""
-    # TODO: Verify Google ID token
-    # In production: use google.oauth2.id_token.verify_oauth2_token
-    # For demo: simulate token verification
+    """Login with Google OAuth access token."""
+    from src.services.google_auth_service import verify_google_access_token, GoogleAuthError
     
-    # Simulated Google user info (replace with actual token verification)
-    google_info = {
-        "google_id": f"google_{request.id_token[:20]}",
-        "email": f"user_{request.id_token[:10]}@gmail.com",
-        "full_name": "Google User",
-        "avatar_url": "https://example.com/avatar.png"
-    }
+    try:
+        google_user = await verify_google_access_token(request.access_token)
+    except GoogleAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
     
-    # Create or get user
-    user = crud_user.create_user_from_google(db, google_info)
+    user = crud_user.create_user_from_google(db, google_user.to_dict())
     
-    # Create token
     token = create_user_token(
         user_id=str(user.id),
         auth_method="google",
         phone_verified=user.phone_verified if hasattr(user, 'phone_verified') else False
     )
     
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": schemas.UserResponse.model_validate(user)
-    }
+    response = JSONResponse(content={
+        "message": "Google login successful",
+        "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
+    })
+    set_auth_cookie(response, token)
+    return response
 
-@router.post("/google/link")
-def link_google_account(
-    request: schemas.GoogleLoginRequest,
-    current_user: schemas.User = Depends(get_current_user),  # Requires authentication
+# ==========================================
+# Password Authentication
+# ==========================================
+
+@router.post("/register")
+def register(
+    request: schemas.UserRegister,
     db: Session = Depends(get_db)
 ):
-    """Link Google account to existing user."""
-    # TODO: Verify Google ID token
-    google_info = {
-        "google_id": f"google_{request.id_token[:20]}",
-        "email": f"user_{request.id_token[:10]}@gmail.com",
-        "full_name": "Google User",
-        "avatar_url": "https://example.com/avatar.png"
-    }
-    
-    # Check if Google ID is already linked
-    existing_user = crud_user.get_user_by_google_id(db, google_info["google_id"])
+    """Register a new user with email and password."""
+    # Check if user already exists
+    existing_user = crud_user.get_user_by_email(db, request.email)
     if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Google account already linked to another user"
-        )
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Link Google account to current user
-    current_user.google_id = google_info["google_id"]
-    current_user.full_name = google_info.get("full_name")
-    current_user.avatar_url = google_info.get("avatar_url")
-    current_user.auth_providers = list(set((current_user.auth_providers or []) + ["google"]))
-    db.commit()
+    user = crud_user.create_user(
+        db, 
+        email=request.email, 
+        password=request.password, 
+        full_name=request.full_name
+    )
     
-    return {
-        "message": "Google account linked successfully",
-        "user": schemas.UserResponse.model_validate(current_user)
-    }
-
-# ==========================================
-# Password Authentication (Existing)
-# ==========================================
+    token = create_user_token(user_id=str(user.id), auth_method="password")
+    
+    response = JSONResponse(content={
+        "message": "Registration successful",
+        "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
+    }, status_code=status.HTTP_201_CREATED)
+    
+    set_auth_cookie(response, token)
+    return response
 
 @router.post("/login")
 def login(
@@ -188,36 +163,37 @@ def login(
     user = crud_user.verify_password_login(db, request.identifier, request.password)
     
     if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Update last login
-    user.last_login = datetime.now()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
     
-    # Create token
     token = create_user_token(
         user_id=str(user.id),
         auth_method="password",
         phone_verified=user.phone_verified if hasattr(user, 'phone_verified') else False
     )
     
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": schemas.UserResponse.model_validate(user)
-    }
+    response = JSONResponse(content={
+        "message": "Login successful",
+        "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
+    })
+    set_auth_cookie(response, token)
+    return response
 
 @router.post("/logout")
 def logout(
+    authorization: str = Depends(lambda authorization=Header(None): authorization),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Logout current user."""
-    # For JWT, logout is handled client-side by removing token
-    # Add token to blacklist if needed for session invalidation
+    """Logout current user and invalidate JWT token."""
+    from src.services.token_blacklist import blacklist_token
+    
+    if authorization:
+        token = authorization[7:] if authorization.startswith("Bearer ") else authorization
+        blacklist_token(token)
+    
     return {"message": "Logged out successfully"}
 
 # ==========================================
@@ -258,9 +234,9 @@ def add_phone_to_profile(
     
     # Send verification code
     verification = crud_user.create_phone_verification(db, request.phone_number)
+    logger.info(f"[DEV] OTP for {request.phone_number}: {verification.verification_code}")
     
     return {
         "message": "Verification code sent",
-        "code": verification.verification_code,  # For demo only!
         "phone_number": request.phone_number
     }

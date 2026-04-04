@@ -39,11 +39,21 @@ def get_user_by_identifier(db: Session, identifier: str) -> Optional[User]:
     # Try username
     return db.query(User).filter(User.username == identifier).first()
 
-def create_user(db: Session, user: UserCreate) -> User:
-    hashed_password = get_password_hash(user.password)
+def create_user(db: Session, email: str, password: str, full_name: Optional[str] = None) -> User:
+    """Create a new user with email and password."""
+    # Derive username from email prefix
+    base_username = email.split("@")[0]
+    username = base_username
+    counter = 1
+    while db.query(User).filter(User.username == username).first():
+        username = f"{base_username}{counter}"
+        counter += 1
+
+    hashed_password = get_password_hash(password)
     db_user = User(
-        username=user.username,
-        email=user.email,
+        username=username,
+        email=email,
+        full_name=full_name,
         hashed_password=hashed_password,
         auth_providers=["password"]
     )
