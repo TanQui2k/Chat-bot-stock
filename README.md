@@ -105,6 +105,30 @@ Chat-bot-stock/
 1. Đảm bảo cả hai máy chủ (Backend & Frontend) đang chạy đồng thời.
 2. Truy cập cổng `3000` trên trình duyệt để bắt đầu trải nghiệm.
 
+## 📊 Bảo trì dữ liệu (Data Maintenance)
+
+Để hệ thống luôn có dữ liệu mới nhất, bạn nên chạy script cập nhật hàng ngày (sau giờ giao dịch, khoảng 15:00 - 16:00):
+
+### 1. Chạy cập nhật thủ công:
+```bash
+cd backend
+python scripts/daily_update.py
+```
+
+### 2. Tự động hóa (Windows):
+Bạn có thể tạo một file `.bat` và dùng **Task Scheduler** để chạy mỗi ngày:
+
+`update_stock.bat`:
+```batch
+@echo off
+cd /d D:\Chat-bot-stock\backend
+call .venv\Scripts\activate
+python scripts/daily_update.py
+pause
+```
+
+---
+
 ## 📄 Giấy phép
 
 Dự án được phát triển cho mục đích học tập và nghiên cứu.

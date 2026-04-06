@@ -1,0 +1,21 @@
+{
+  "symbol": "VPB",
+  "trained_at": "2026-04-06T11:03:41.353057",
+  "data_rows": 1376,
+  "date_range": {
+    "start": "2017-12-13",
+    "end": "2026-04-01"
+  },
+  "params": {
+    "changepoint_prior_scale": 0.001,
+    "seasonality_prior_scale": 20.0,
+    "seasonality_mode": "multiplicative",
+    "n_changepoints": 30,
+    "changepoint_range": 0.85
+  },
+  "metrics": {
+    "mae": 3.0129,
+    "rmse": 3.3548,
+    "mape": 10.68
+  }
+}

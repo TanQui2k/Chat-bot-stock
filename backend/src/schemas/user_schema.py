@@ -65,7 +65,8 @@ class LoginRequest(BaseModel):
     password: str
 
 class UserRegister(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = Field(None, pattern=r'^(\+84|0|84)[0-9]{9,10}$')
     password: str = Field(..., min_length=8)
     full_name: Optional[str] = None
 

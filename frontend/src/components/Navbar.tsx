@@ -1,12 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { AuthModal } from "./AuthModal";
 import { useAuth } from "@/context/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
 
 export const Navbar: React.FC = () => {
   const { user, logout, showAuthModal, isAuthModalOpen, setIsAuthModalOpen, login } = useAuth();
+  const [imgError, setImgError] = useState(false);
+
+  // Reset image error state when user changes
+  useEffect(() => {
+    setImgError(false);
+  }, [user?.id]);
+
+  // Check if avatar_url is valid (not empty, not just a label)
+  const hasValidAvatar = user?.avatar_url && 
+                        user.avatar_url.trim() !== "" && 
+                        !["avatar", "none", "null"].includes(user.avatar_url.toLowerCase());
 
   return (
     <>
@@ -65,9 +76,15 @@ export const Navbar: React.FC = () => {
                     Đăng xuất
                   </button>
                 </div>
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm text-white font-bold shadow-sm border border-slate-700">
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm text-white font-bold shadow-sm border border-slate-700 overflow-hidden">
+                  {hasValidAvatar && !imgError ? (
+                    <img 
+                      src={user.avatar_url} 
+                      alt="Avatar" 
+                      className="h-full w-full object-cover" 
+                      referrerPolicy="no-referrer"
+                      onError={() => setImgError(true)}
+                    />
                   ) : (
                     (user.full_name || user.username || "U").substring(0, 2).toUpperCase()
                   )}

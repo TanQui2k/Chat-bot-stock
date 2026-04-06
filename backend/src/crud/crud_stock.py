@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -40,3 +41,19 @@ async def get_historical_prices(
     )
     prices = list(db.scalars(stmt).all())
     return prices[::-1]
+
+def create_predictions(db: Session, ticker_id: int, predictions_list: list, model_version: str):
+    """
+    Save generated predictions to the database.
+    """
+    for p in predictions_list:
+        db_prediction = Prediction(
+            ticker_id=ticker_id,
+            target_date=datetime.strptime(p['date'], '%Y-%m-%d').date(),
+            predicted_close=p['predicted_close'],
+            model_version=model_version,
+            confidence_score=p.get('confidence_score') # Optional: based on MAPE or range
+        )
+        db.add(db_prediction)
+    
+    db.commit()

@@ -27,7 +27,13 @@ const PasswordLoginForm: React.FC<{
     try {
       let response;
       if (isRegister) {
-        response = await authApi.register(identifier, password, fullName);
+        const isEmail = identifier.includes("@");
+        response = await authApi.register(
+          isEmail ? identifier : undefined, 
+          password, 
+          fullName,
+          !isEmail ? identifier : undefined
+        );
       } else {
         response = await authApi.login(identifier, password);
       }
@@ -48,7 +54,7 @@ const PasswordLoginForm: React.FC<{
         </h3>
         <p className="text-sm text-slate-500 mt-2">
           {isRegister 
-            ? "Tạo tài khoản mới để bắt đầu sử dụng" 
+            ? "Tạo tài khoản mới để bắt đầu sử dụng"
             : "Nhập email hoặc số điện thoại và mật khẩu của bạn"}
         </p>
       </div>
@@ -76,13 +82,13 @@ const PasswordLoginForm: React.FC<{
         )}
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
-            {isRegister ? "Email" : "Email hoặc Số điện thoại"}
+            Email hoặc Số điện thoại
           </label>
           <input
-            type={isRegister ? "email" : "text"}
+            type="text"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder={isRegister ? "email@example.com" : "email@example.com hoặc +84xxxxxxxxx"}
+            placeholder="email@example.com hoặc 0xxxxxxxxx"
             className="w-full px-4 py-3.5 border-2 border-slate-200 rounded-xl focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none text-slate-700 placeholder:text-slate-400"
           />
         </div>

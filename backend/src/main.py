@@ -48,3 +48,4 @@ app.include_router(anomaly.router, prefix="/api", tags=["Anomaly Detection"])
 @app.get("/")
 def read_root():
     return {"message": "Welcome to StockAI API"}
+

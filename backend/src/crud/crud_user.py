@@ -39,10 +39,14 @@ def get_user_by_identifier(db: Session, identifier: str) -> Optional[User]:
     # Try username
     return db.query(User).filter(User.username == identifier).first()
 
-def create_user(db: Session, email: str, password: str, full_name: Optional[str] = None) -> User:
-    """Create a new user with email and password."""
-    # Derive username from email prefix
-    base_username = email.split("@")[0]
+def create_user(db: Session, password: str, email: Optional[str] = None, phone_number: Optional[str] = None, full_name: Optional[str] = None) -> User:
+    """Create a new user with email/phone and password."""
+    # Derive username from identifier
+    identifier = email or phone_number
+    if not identifier:
+        raise ValueError("Either email or phone_number must be provided")
+        
+    base_username = identifier.split("@")[0] if "@" in identifier else identifier
     username = base_username
     counter = 1
     while db.query(User).filter(User.username == username).first():
@@ -52,7 +56,9 @@ def create_user(db: Session, email: str, password: str, full_name: Optional[str]
     hashed_password = get_password_hash(password)
     db_user = User(
         username=username,
-        email=email,
+        email=email.lower().strip() if email else None,
+        phone_number=phone_number,
+        phone_verified=True if phone_number else False,
         full_name=full_name,
         hashed_password=hashed_password,
         auth_providers=["password"]

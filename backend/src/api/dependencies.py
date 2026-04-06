@@ -1,5 +1,5 @@
 from src.core.config import SessionLocal
-from fastapi import Depends, HTTPException, Header
+from fastapi import Depends, HTTPException, Header, Cookie
 from typing import Optional
 
 def get_db():
@@ -16,22 +16,27 @@ def get_db():
 
 async def get_current_user(
     authorization: Optional[str] = Header(None),
+    access_token: Optional[str] = Cookie(None),
     db = Depends(get_db)
 ):
-    """Get current authenticated user from JWT token."""
+    """Get current authenticated user from JWT token (Header or Cookie)."""
     from src.core.security import verify_token
     from src.crud.crud_user import get_user
     
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
+    token = None
+    if authorization:
         # Remove "Bearer " prefix if present
         if authorization.startswith("Bearer "):
             token = authorization[7:]
         else:
             token = authorization
-        
+    elif access_token:
+        token = access_token
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
         payload = verify_token(token)
         if payload is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -57,22 +62,26 @@ async def get_current_user(
 
 async def get_optional_user(
     authorization: Optional[str] = Header(None),
+    access_token: Optional[str] = Cookie(None),
     db = Depends(get_db)
 ):
     """Get current user if authenticated, otherwise return None."""
     from src.core.security import verify_token
     from src.crud.crud_user import get_user
     
-    if not authorization:
-        return None
-    
-    try:
-        # Remove "Bearer " prefix if present
+    token = None
+    if authorization:
         if authorization.startswith("Bearer "):
             token = authorization[7:]
         else:
             token = authorization
+    elif access_token:
+        token = access_token
         
+    if not token:
+        return None
+    
+    try:
         payload = verify_token(token)
         if payload is None:
             return None
@@ -89,4 +98,4 @@ async def get_optional_user(
         user = get_user(db, user_id)
         return user
     except Exception:
-        return None
+        return None

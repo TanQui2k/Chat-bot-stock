@@ -8,16 +8,24 @@ from typing import Any
 
 def extract_tickers(text: str, allowed: set[str] | None = None) -> list[str]:
     """Extract stock tickers from text (3-5 uppercase letters)."""
+    # Build a more exhaustive default list of top VN tickers if none provided
     if allowed is None:
         allowed = {
-            "fpt", "vnm", "msn", "vic", "vpb", "vcb", "mb", "hdb", "stc", "dig",
-            "hpg", "kdh", "ssi", "vci", "shb", "tpb", "vgr", "vds", "vgs", "vic",
-            "vng", "vrs", "vsh", "vst", "vtc", "vtk", "vtr", "vtx", "vty"
+            "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
+            "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
+            "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+            "VND", "VCI", "HCM", "DIG", "NVL", "PVD", "PVS", "HSG", "NKG"
         }
+    else:
+        # Normalize uppercase if custom list provided
+        allowed = {a.upper() for a in allowed}
     
+    # 1. Look for uppercase 3-5 letter words directly
+    candidates = re.findall(r"\b([A-Z]{3,5})\b", text.upper())
+    
+    # 2. Filter valid tickers and remove duplicates while preserving order
     return list(dict.fromkeys(
-        m.upper() for m in re.findall(r"\b([A-Z]{3,5})\b", text.upper())
-        if m.lower() in allowed
+        m for m in candidates if m in allowed
     ))
 
 

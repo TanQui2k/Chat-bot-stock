@@ -10,7 +10,7 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
     hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone_number: Mapped[Optional[str]] = mapped_column(String(20), unique=True, index=True)
     phone_verified: Mapped[bool] = mapped_column(default=False)

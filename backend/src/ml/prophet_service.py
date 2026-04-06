@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.models.stock import Ticker, DailyPrice
+from src.crud.crud_stock import create_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -274,11 +275,38 @@ class ProphetService:
         # 6. Build response
         predictions = []
         last_known_price = history_data[-1]['close'] if history_data else None
+        
+        # Determine exchange price limits
+        exchange = ticker.exchange.upper() if ticker and ticker.exchange else 'HOSE'
+        if exchange == 'HNX':
+            limit_pct = 0.10
+        elif exchange == 'UPCOM':
+            limit_pct = 0.15
+        else:
+            limit_pct = 0.07  # HOSE default
 
         for _, row in forecast.iterrows():
-            pred_close = round(float(row['yhat']), 2)
-            lower = round(float(row['yhat_lower']), 2)
-            upper = round(float(row['yhat_upper']), 2)
+            pred_close = float(row['yhat'])
+            lower = float(row['yhat_lower'])
+            upper = float(row['yhat_upper'])
+
+            if last_known_price is not None:
+                # Apply Vietnamese market rules: ± limits based on previous close price
+                floor_price = last_known_price * (1 - limit_pct)
+                ceiling_price = last_known_price * (1 + limit_pct)
+                
+                pred_close = max(floor_price, min(ceiling_price, pred_close))
+                lower = max(floor_price, min(ceiling_price, lower))
+                upper = max(floor_price, min(ceiling_price, upper))
+            
+            # Ensure bounds are structurally sound
+            lower = min(lower, pred_close)
+            upper = max(upper, pred_close)
+
+            # Round for output
+            pred_close = round(pred_close, 2)
+            lower = round(lower, 2)
+            upper = round(upper, 2)
 
             trend = 'UP'
             if last_known_price is not None:
@@ -291,7 +319,24 @@ class ProphetService:
                 'upper_bound': upper,
                 'trend': trend,
             })
-            last_known_price = pred_close  # chain for multi-day trend
+            last_known_price = pred_close  # chain reference price for multi-day forecast
+
+        # 7. Save predictions to database for future improvement
+        if ticker:
+            try:
+                # Use mape as a proxy for confidence if available
+                confidence = None
+                if metadata and 'metrics' in metadata:
+                    confidence = metadata['metrics'].get('mape')
+                
+                # Add confidence to each dict if we want to save it
+                for p in predictions:
+                    p['confidence_score'] = confidence
+
+                create_predictions(db, ticker.id, predictions, 'prophet_v2')
+                logger.info(f"Saved {len(predictions)} predictions for {symbol} to database.")
+            except Exception as e:
+                logger.error(f"Error saving predictions for {symbol}: {str(e)}")
 
         return {
             'symbol': symbol,

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 import re
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ PHONE_PATTERN = re.compile(r'^(\+84|0|84)[0-9]{9,10}$')
 from src import schemas
 from src.crud import crud_user
 from src.core.security import (
-    create_user_token, verify_password, get_password_hash
+    create_user_token, verify_password, get_password_hash, JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from src.api.dependencies import get_db, get_current_user
 
@@ -26,7 +27,7 @@ def set_auth_cookie(response: JSONResponse, token: str):
     is_production = os.environ.get("ENVIRONMENT", "development").lower() == "production"
     
     # Use expiration from settings (minutes to seconds)
-    max_age_seconds = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    max_age_seconds = JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
     
     response.set_cookie(
         key="access_token",
@@ -139,20 +140,31 @@ def register(
     request: schemas.UserRegister,
     db: Session = Depends(get_db)
 ):
-    """Register a new user with email and password."""
+    """Register a new user with email/phone and password."""
     # Email normalization
-    email = request.email.lower().strip()
+    email = request.email.lower().strip() if request.email else None
+    phone_number = request.phone_number
+    
+    if not email and not phone_number:
+        raise HTTPException(status_code=400, detail="Email or phone number required")
     
     # Check if user already exists
-    existing_user = crud_user.get_user_by_email(db, email)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if email:
+        existing_user = crud_user.get_user_by_email(db, email)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+            
+    if phone_number:
+        existing_phone = crud_user.get_user_by_phone(db, phone_number)
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Phone number already registered")
     
     try:
         user = crud_user.create_user(
             db, 
+            password=request.password,
             email=email, 
-            password=request.password, 
+            phone_number=phone_number,
             full_name=request.full_name
         )
     except Exception as e:

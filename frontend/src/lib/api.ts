@@ -110,14 +110,20 @@ export const authApi = {
   },
 
   register: async (
-    email: string,
-    password: string,
-    fullName?: string
+    email?: string,
+    password?: string,
+    fullName?: string,
+    phoneNumber?: string
   ): Promise<AuthResponse> => {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, full_name: fullName }),
+      body: JSON.stringify({ 
+        email, 
+        password, 
+        full_name: fullName,
+        phone_number: phoneNumber 
+      }),
       credentials: "include",
     });
 
