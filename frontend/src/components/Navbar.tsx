@@ -1,23 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { AuthModal } from "./AuthModal";
 import { useAuth } from "@/context/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
 
 export const Navbar: React.FC = () => {
   const { user, logout, showAuthModal, isAuthModalOpen, setIsAuthModalOpen, login } = useAuth();
-  const [imgError, setImgError] = useState(false);
-
-  // Reset image error state when user changes
-  useEffect(() => {
-    setImgError(false);
-  }, [user?.id]);
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
 
   // Check if avatar_url is valid (not empty, not just a label)
-  const hasValidAvatar = user?.avatar_url && 
-                        user.avatar_url.trim() !== "" && 
-                        !["avatar", "none", "null"].includes(user.avatar_url.toLowerCase());
+  const hasValidAvatar = Boolean(
+    user?.avatar_url &&
+    user.avatar_url.trim() !== "" &&
+    !["avatar", "none", "null"].includes(user.avatar_url.toLowerCase())
+  );
+  const avatarUrl: string | null = hasValidAvatar ? (user?.avatar_url ?? null) : null;
+  const showAvatarImage = Boolean(avatarUrl) && failedAvatarUrl !== avatarUrl;
 
   return (
     <>
@@ -77,13 +76,14 @@ export const Navbar: React.FC = () => {
                   </button>
                 </div>
                 <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm text-white font-bold shadow-sm border border-slate-700 overflow-hidden">
-                  {hasValidAvatar && !imgError ? (
+                  {showAvatarImage ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img 
-                      src={user.avatar_url} 
+                      src={avatarUrl ?? ''} 
                       alt="Avatar" 
                       className="h-full w-full object-cover" 
                       referrerPolicy="no-referrer"
-                      onError={() => setImgError(true)}
+                      onError={() => setFailedAvatarUrl(avatarUrl ?? null)}
                     />
                   ) : (
                     (user.full_name || user.username || "U").substring(0, 2).toUpperCase()

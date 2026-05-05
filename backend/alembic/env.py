@@ -13,7 +13,7 @@ from src.core.config import settings
 from src.models.base import Base
 
 # Import your models here to ensure metadata is populated
-from src.models.user import User
+from src.models.user import User, PhoneNumberVerification
 from src.models.stock import Ticker, DailyPrice
 
 # this is the Alembic Config object, which provides

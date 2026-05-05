@@ -1,12 +1,22 @@
-import pytest
-from fastapi.testclient import TestClient
+import unittest
+
+import httpx
+
 from src.main import app
 
-client = TestClient(app)
 
-def test_read_root():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to StockAI API"}
+class AppSmokeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_read_root(self) -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/")
 
-# We won't test DB endpoints since the DB connection might fail without proper config
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Welcome to StockAI API"})
+
+
+if __name__ == "__main__":
+    unittest.main()

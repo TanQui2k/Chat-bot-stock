@@ -58,6 +58,8 @@ Chat-bot-stock/
    pip install -r requirements.txt
    ```
 
+   Nếu bạn đã tạo môi trường từ trước, nên chạy lại lệnh trên để đồng bộ đúng bộ version đã được pin cho runtime và test.
+
 3. **Cấu hình môi trường**:
 
    - Tạo file `.env` trong thư mục `backend/`.
@@ -80,6 +82,12 @@ Chat-bot-stock/
    ```
 
    > 🔗 Truy cập: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
+
+6. **Chạy smoke test backend**:
+
+   ```bash
+   python -m unittest discover -s tests -p "test_*.py"
+   ```
 
 ### 3. Thiết lập Frontend (Next.js)
 

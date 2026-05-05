@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
-import { QueryProvider } from "@/services/QueryProvider";
 import { Toaster } from "sonner";
 
 const inter = Inter({
@@ -28,17 +27,15 @@ export default function RootLayout({
     <html lang="vi" suppressHydrationWarning={true}>
       <body suppressHydrationWarning={true} className={`${inter.className} antialiased h-screen overflow-hidden bg-background text-foreground flex flex-col transition-colors duration-300`}>
         <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider>
-              <Navbar />
-              <Toaster position="top-right" richColors closeButton />
+          <AuthProvider>
+            <Navbar />
+            <Toaster position="top-right" richColors closeButton />
 
-              {/* Main Content Container - Fixed Height, No Scroll */}
-              <main className="flex-1 w-full flex flex-col min-h-0 overflow-hidden">
-                {children}
-              </main>
-            </AuthProvider>
-          </QueryProvider>
+            {/* Main Content Container - Fixed Height, No Scroll */}
+            <main className="flex-1 w-full flex flex-col min-h-0 overflow-hidden">
+              {children}
+            </main>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

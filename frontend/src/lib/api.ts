@@ -1,13 +1,7 @@
 "use client";
 
 // API Client for StockAI Application
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-
-interface ApiResponse<T> {
-  data?: T;
-  error?: string;
-  message?: string;
-}
+import { API_BASE_URL } from "@/lib/apiConfig";
 
 // ==========================================
 // Authentication API

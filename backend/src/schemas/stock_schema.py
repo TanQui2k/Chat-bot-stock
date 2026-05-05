@@ -43,6 +43,8 @@ class PredictionBase(BaseModel):
     confidence_score: Optional[float] = None
     model_version: str
 
+    model_config = ConfigDict(protected_namespaces=())
+
 class PredictionCreate(PredictionBase):
     ticker_id: int
 

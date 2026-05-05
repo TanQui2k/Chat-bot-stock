@@ -1,9 +1,9 @@
 {
-  "symbol": "FPT",
-  "trained_at": "2026-05-04T16:22:50.321292",
-  "data_rows": 1111,
+  "symbol": "SHB",
+  "trained_at": "2026-05-04T16:11:22.472989",
+  "data_rows": 1361,
   "date_range": {
-    "start": "2018-12-12",
+    "start": "2017-12-13",
     "end": "2026-04-06"
   },
   "params": {
@@ -14,8 +14,8 @@
     "changepoint_range": 0.85
   },
   "metrics": {
-    "mae": 14.6451,
-    "rmse": 18.8585,
-    "mape": 18.28
+    "mae": 1.9517,
+    "rmse": 2.0892,
+    "mape": 12.32
   }
 }

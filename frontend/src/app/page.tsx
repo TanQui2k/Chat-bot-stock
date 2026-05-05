@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Dashboard() {
   const [selectedTicker, setSelectedTicker] = useState('FPT');
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (

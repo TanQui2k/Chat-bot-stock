@@ -1,31 +1,41 @@
 import os
 import sys
-import pandas as pd
-from datetime import datetime, timedelta, date
 import time
-import math
-from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from datetime import datetime, timedelta
 
-# Thêm thư mục backend vào sys.path để có thể import từ src
+import pandas as pd
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
+# Add backend directory to Python path for local imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
 sys.path.append(backend_dir)
 
 from src.core.config import SessionLocal
-from src.models.stock import Ticker, DailyPrice
+from src.crud.crud_stock import upsert_daily_prices
+from src.models.stock import DailyPrice, Ticker
 
-# Import vnstock - Thử import theo cả 2 version cũ và mới
 try:
     from vnstock import stock_historical_data
+
     VNSTOCK_V3 = True
 except ImportError:
     try:
         from vnstock.api.quote import Quote
+
         VNSTOCK_V3 = False
     except ImportError:
-        print("Vui lòng cài đặt vnstock: pip install vnstock")
+        print("Please install vnstock: pip install vnstock")
         sys.exit(1)
+
+REQUEST_DELAY = 0.9
+RETRY_WAIT = 30
+MAX_RETRIES = 5
+
 
 def get_db():
     db = SessionLocal()
@@ -35,134 +45,145 @@ def get_db():
         db.close()
         raise
 
+
+def fetch_history_with_retry(symbol: str, start_date: str, end_date: str):
+    for attempt in range(MAX_RETRIES):
+        try:
+            if VNSTOCK_V3:
+                return stock_historical_data(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    resolution="1D",
+                    type="stock",
+                )
+            return Quote(symbol=symbol).history(start=start_date, end=end_date)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "rate limit" in err_str or "429" in err_str or "too many" in err_str or "quá nhiều request" in err_str:
+                wait_seconds = RETRY_WAIT * (attempt + 1)
+                print(f"Rate limited, waiting {wait_seconds}s...", end=" ", flush=True)
+                time.sleep(wait_seconds)
+                continue
+            raise
+    return None
+
+
 def update_ticker_data(db: Session, ticker: Ticker, today_str: str):
-    """Cập nhật dữ liệu cho một mã chứng khoán đơn lẻ."""
-    # 1. Tìm ngày cuối cùng có dữ liệu trong DB
-    last_date_query = db.query(func.max(DailyPrice.date)).filter(DailyPrice.ticker_id == ticker.id).scalar()
-    
-    start_date = "2024-01-01" # Mặc định lấy từ đầu năm 2024 nếu DB trống
+    """Incrementally update one ticker from the last stored date to today."""
+    last_date_query = (
+        db.query(func.max(DailyPrice.date))
+        .filter(DailyPrice.ticker_id == ticker.id)
+        .scalar()
+    )
+
+    start_date = "2024-01-01"
     if last_date_query:
-        # Nếu đã có dữ liệu, lấy từ ngày tiếp theo
         start_date = (last_date_query + timedelta(days=1)).strftime("%Y-%m-%d")
-    
-    # Nếu start_date đã vượt quá hôm nay, không cần làm gì
+
     if datetime.strptime(start_date, "%Y-%m-%d").date() > datetime.now().date():
         return 0, "Already updated"
 
-    # 2. Lấy dữ liệu từ vnstock
     try:
-        df = None
-        if VNSTOCK_V3:
-            # vnstock v3 (vnstock3)
-            df = stock_historical_data(symbol=ticker.symbol, start_date=start_date, end_date=today_str, resolution="1D", type="stock")
-        else:
-            # vnstock v0.2.x
-            df = Quote(symbol=ticker.symbol).history(start=start_date, end=today_str)
-        
+        df = fetch_history_with_retry(ticker.symbol, start_date, today_str)
         if df is None or df.empty:
             return 0, "No new data"
-        
-        # Chuẩn hóa format (vnstock trả về khác nhau tùy version/nguồn)
-        # Thông thường có: time/date, open, high, low, close, volume
-        if 'time' in df.columns:
-            df = df.rename(columns={'time': 'date'})
-        
-        # Đảm bảo có các cột cần thiết
-        required_cols = ['date', 'open', 'high', 'low', 'close', 'volume']
+
+        if "time" in df.columns:
+            df = df.rename(columns={"time": "date"})
+
+        required_cols = ["date", "open", "high", "low", "close", "volume"]
         for col in required_cols:
             if col not in df.columns:
-                if col == 'volume' and 'vol' in df.columns:
-                    df = df.rename(columns={'vol': 'volume'})
+                if col == "volume" and "vol" in df.columns:
+                    df = df.rename(columns={"vol": "volume"})
                 else:
                     df[col] = None
-        
-        records_to_insert = []
+
+        records_to_upsert = []
         for _, row in df.iterrows():
-            # Chuyển đổi date
-            d = row['date']
-            if isinstance(d, str):
+            day_value = row["date"]
+
+            if isinstance(day_value, str):
                 try:
-                    d = datetime.strptime(d, "%Y-%m-%d").date()
-                except:
+                    day_value = datetime.strptime(day_value, "%Y-%m-%d").date()
+                except ValueError:
                     continue
-            elif hasattr(d, 'date'):
-                d = d.date()
-            
-            # Bỏ qua nếu ngày này đã có trong DB (để chắc chắn)
-            if last_date_query and d <= last_date_query:
+            elif hasattr(day_value, "date"):
+                day_value = day_value.date()
+
+            if last_date_query and day_value <= last_date_query:
                 continue
-                
-            dp = DailyPrice(
-                ticker_id=ticker.id,
-                date=d,
-                open=float(row['open']) if not pd.isna(row['open']) else None,
-                high=float(row['high']) if not pd.isna(row['high']) else None,
-                low=float(row['low']) if not pd.isna(row['low']) else None,
-                close=float(row['close']) if not pd.isna(row['close']) else None,
-                volume=int(row['volume']) if not pd.isna(row['volume']) else None
+
+            records_to_upsert.append(
+                {
+                    "date": day_value,
+                    "open": float(row["open"]) if not pd.isna(row["open"]) else None,
+                    "high": float(row["high"]) if not pd.isna(row["high"]) else None,
+                    "low": float(row["low"]) if not pd.isna(row["low"]) else None,
+                    "close": float(row["close"]) if not pd.isna(row["close"]) else None,
+                    "volume": int(row["volume"]) if not pd.isna(row["volume"]) else None,
+                }
             )
-            records_to_insert.append(dp)
-        
-        if records_to_insert:
-            db.bulk_save_objects(records_to_insert)
-            db.commit()
-            return len(records_to_insert), "Success"
-        
+
+        if records_to_upsert:
+            affected_rows = upsert_daily_prices(db, ticker.id, records_to_upsert)
+            return affected_rows, "Success"
+
         return 0, "No new data after filtering"
 
     except Exception as e:
         db.rollback()
         return 0, f"Error: {str(e)}"
 
+
 def main():
     print(f"=== DAILY UPDATE SCRIPT - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
-    
+
     db = get_db()
     today_str = datetime.now().strftime("%Y-%m-%d")
-    
-    # 1. Lấy danh sách tất cả các mã VN
-    tickers = db.query(Ticker).filter(Ticker.is_active == True).all()
-    # Nếu bạn chỉ muốn update VN stock: .filter(Ticker.exchange.in_(['HOSE', 'HNX', 'UPCOM']))
-    
+    tickers = db.query(Ticker).filter(Ticker.is_active.is_(True)).all()
+
     print(f"Found {len(tickers)} active tickers to update.")
-    
+
     total_added = 0
     errors = []
-    
-    for i, t in enumerate(tickers):
-        print(f"[{i+1}/{len(tickers)}] Updating {t.symbol:6}...", end=" ", flush=True)
-        
+
+    for index, ticker in enumerate(tickers, start=1):
+        print(f"[{index}/{len(tickers)}] Updating {ticker.symbol:6}...", end=" ", flush=True)
+
         start_time = time.time()
-        added, status = update_ticker_data(db, t, today_str)
+        added, status = update_ticker_data(db, ticker, today_str)
         elapsed = time.time() - start_time
-        
+
         if added > 0:
-            print(f"✅ Added {added} rows ({elapsed:.2f}s)")
+            print(f"Added {added} rows ({elapsed:.2f}s)")
             total_added += added
         elif status == "Already updated":
-            print(f"⏭️ {status} ({elapsed:.2f}s)")
+            print(f"{status} ({elapsed:.2f}s)")
         elif status == "No new data":
-            print(f"⚪ {status} ({elapsed:.2f}s)")
+            print(f"{status} ({elapsed:.2f}s)")
         else:
-            print(f"❌ {status} ({elapsed:.2f}s)")
-            errors.append((t.symbol, status))
-        
-        # Nghỉ ngắn để tránh bị block API (quan trọng với Vnstock)
-        time.sleep(0.5)
-    
+            print(f"{status} ({elapsed:.2f}s)")
+            errors.append((ticker.symbol, status))
+
+        if status != "Already updated":
+            time.sleep(REQUEST_DELAY)
+
     db.close()
-    
-    print("\n" + "="*50)
-    print(f"FINISHED DAILY UPDATE")
+
+    print("\n" + "=" * 50)
+    print("FINISHED DAILY UPDATE")
     print(f"Total new records added: {total_added}")
     print(f"Tickers with errors: {len(errors)}")
     if errors:
         print("\nDetail errors:")
-        for sym, err in errors[:10]:
-            print(f"- {sym}: {err}")
+        for symbol, err in errors[:10]:
+            print(f"- {symbol}: {err}")
         if len(errors) > 10:
-            print(f"... and {len(errors)-10} more")
-    print("="*50)
+            print(f"... and {len(errors) - 10} more")
+    print("=" * 50)
+
 
 if __name__ == "__main__":
     main()

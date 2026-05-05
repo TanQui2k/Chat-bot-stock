@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const profile = await authApi.getProfile();
         setUser(profile);
-      } catch (error: unknown) {
+      } catch {
         // Not logged in or session expired - silent failure during init
         setUser(null);
       } finally {

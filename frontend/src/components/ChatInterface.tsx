@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { chatService, Message, generateUUID } from '@/services/chatService';
 import ChatMessageItem from './chat/ChatMessageItem';
@@ -26,7 +26,7 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  const initSession = async () => {
+  const initSession = useCallback(async () => {
     try {
       const userId = user?.id || generateUUID();
       const id = await chatService.initSession(userId);
@@ -36,11 +36,11 @@ export default function ChatInterface() {
       console.error("Failed to init chat session", err);
     }
     return null;
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     initSession();
-  }, [user?.id]);
+  }, [initSession]);
 
   const handleSend = async (forcedInput?: string) => {
     const textToSend = forcedInput || input.trim();
@@ -66,7 +66,7 @@ export default function ChatInterface() {
     try {
       const assistantMsg = await chatService.sendMessage(currentSessionId, textToSend);
       setMessages(prev => [...prev, assistantMsg]);
-    } catch (err: any) {
+    } catch {
       setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: "Có lỗi xảy ra khi kết nối với AI." }]);
     } finally {
       setIsLoading(false);
@@ -121,7 +121,7 @@ export default function ChatInterface() {
       )}
 
       <div className={`w-full transition-all duration-500 px-4 md:px-0 ${
-        messages.length > 0 ? 'pb-12 pt-4 border-t border-border bg-card/30 shrink-0' : 'flex flex-col items-center flex-none'
+        messages.length > 0 ? 'pb-4 pt-4 border-t border-border bg-card/30 shrink-0' : 'flex flex-col items-center flex-none mt-16'
       }`}>
         <div className="max-w-3xl mx-auto flex flex-col items-center w-full">
           

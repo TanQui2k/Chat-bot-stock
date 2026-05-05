@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import date, datetime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Integer, Float, Date, DateTime, text, ForeignKey
+from sqlalchemy import String, Integer, Float, Date, DateTime, text, ForeignKey, UniqueConstraint
 from src.models.base import Base
 
 class Ticker(Base):
@@ -26,6 +26,9 @@ class Ticker(Base):
 
 class DailyPrice(Base):
     __tablename__ = "daily_prices"
+    __table_args__ = (
+        UniqueConstraint("ticker_id", "date", name="uq_daily_prices_ticker_date"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
     ticker_id: Mapped[int] = mapped_column(

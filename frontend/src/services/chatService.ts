@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '@/lib/apiConfig';
+
 export type Message = {
   id: string;
   role: 'user' | 'assistant';
@@ -13,12 +15,12 @@ export const generateUUID = (): string => {
   });
 };
 
-const API_BASE_URL = 'http://localhost:8000/api/chat';
+const CHAT_API_BASE_URL = `${API_BASE_URL}/chat`;
 
 export const chatService = {
   async initSession(userId: string): Promise<string | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/sessions`, {
+      const res = await fetch(`${CHAT_API_BASE_URL}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -42,7 +44,7 @@ export const chatService = {
   },
 
   async sendMessage(sessionId: string, content: string): Promise<Message> {
-    const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/turn`, {
+    const res = await fetch(`${CHAT_API_BASE_URL}/sessions/${sessionId}/turn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),

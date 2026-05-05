@@ -34,7 +34,7 @@ export default function ChatWelcome({ onSuggestionClick }: ChatWelcomeProps) {
         <p className="text-muted-foreground text-xl font-medium">Trao đổi cùng Trợ lý Chứng khoán AI</p>
       </div>
 
-      <div className="w-full mt-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+      <div className="w-full mt-12 mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
         <div className="flex items-center justify-center gap-6 mb-8">
           <div className="h-px bg-border flex-1 max-w-[100px]"></div>
           <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground font-bold whitespace-nowrap">

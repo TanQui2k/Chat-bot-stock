@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 
 import Fuse from 'fuse.js';
+import { API_BASE_URL } from '@/lib/apiConfig';
 
 interface PriceData {
   id: number;
@@ -42,6 +43,26 @@ interface PredictionResponse {
   history: { date: string; close: number | null }[];
 }
 
+interface TickerItem {
+  symbol: string;
+  name: string;
+  company_name?: string;
+}
+
+interface TooltipItem {
+  dataKey?: string;
+  value?: number | string | null;
+}
+
+interface ChartPoint {
+  date: string;
+  fullDate: string;
+  price: number | null;
+  predicted: number | null;
+  upperBound: number | null;
+  lowerBound: number | null;
+}
+
 const popularTickers = ['FPT', 'VNM', 'MSN', 'VPB', 'ACB', 'HPG', 'VIC', 'VCB'];
 
 export default function InteractiveChart({
@@ -52,13 +73,12 @@ export default function InteractiveChart({
   setSelectedTicker: (ticker: string) => void;
 }) {
   const [data, setData] = useState<PriceData[]>([]);
-  const [allTickers, setAllTickers] = useState<{ symbol: string, name: string }[]>([]);
+  const [allTickers, setAllTickers] = useState<{ symbol: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState('1M');
   const [showTickerMenu, setShowTickerMenu] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const chartRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Prediction state
@@ -71,12 +91,11 @@ export default function InteractiveChart({
     let isMounted = true;
     const fetchTickers = async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-        const res = await fetch(`${baseUrl}/stocks/`);
+        const res = await fetch(`${API_BASE_URL}/stocks/`);
         if (res.ok) {
           const json = await res.json();
           if (isMounted) {
-            setAllTickers(json.map((t: any) => ({
+            setAllTickers((json as TickerItem[]).map((t) => ({
               symbol: t.symbol,
               name: t.name || t.company_name || 'Công ty Cổ phần ' + t.symbol
             })));
@@ -135,14 +154,15 @@ export default function InteractiveChart({
       try {
         setLoading(true);
         setError(null);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-        const res = await fetch(`${baseUrl}/stocks/${symbol}/history`);
+        const res = await fetch(`${API_BASE_URL}/stocks/${symbol}/history`);
         if (!res.ok) throw new Error("Lỗi tải dữ liệu hoặc mã không tồn tại!");
 
         const json = await res.json();
         if (isMounted) setData(json);
-      } catch (err: any) {
-        if (isMounted) setError(err.message);
+      } catch (err: unknown) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load data');
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -157,8 +177,7 @@ export default function InteractiveChart({
     const fetchPrediction = async () => {
       try {
         setPredLoading(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-        const res = await fetch(`${baseUrl.replace('/api', '')}/api/predict/`, {
+        const res = await fetch(`${API_BASE_URL}/predict/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ticker: symbol, days: 10 }),
@@ -182,35 +201,43 @@ export default function InteractiveChart({
 
   // Merge historical data + prediction into single chart dataset
   const chartData = (() => {
-    // Historical data points
-    const historyPoints = data.map(item => ({
+    // Helper to safely parse numbers from potential localized strings
+    const parseNum = (val: unknown): number => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') {
+        const normalized = val.replace(',', '.').replace(/[^-0-9.]/g, '');
+        return parseFloat(normalized) || 0;
+      }
+      return 0;
+    };
+
+    // 1. Historical data points - ensure we have a fresh copy and sort by date 
+    const historyPoints: ChartPoint[] = data.map(item => ({
       date: new Date(item.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
       fullDate: item.date,
-      price: item.close || 0,
-      predicted: null as number | null,
-      upperBound: null as number | null,
-      lowerBound: null as number | null,
+      price: parseNum(item.close),
+      predicted: null,
+      upperBound: null,
+      lowerBound: null,
     }));
 
-    // If we have predictions and they should be shown
+    // 2. Prediction data merging
     if (showPrediction && prediction && prediction.predictions.length > 0) {
-      // Add bridge point: last historical point also starts prediction line
+      // Find the bridge point in history to start prediction from
       if (historyPoints.length > 0) {
         const lastPoint = historyPoints[historyPoints.length - 1];
         lastPoint.predicted = lastPoint.price;
-        lastPoint.upperBound = lastPoint.price;
-        lastPoint.lowerBound = lastPoint.price;
       }
 
-      // Add prediction points
+      // Add actual prediction points
       for (const pred of prediction.predictions) {
         historyPoints.push({
           date: new Date(pred.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
           fullDate: pred.date,
-          price: null as any,
-          predicted: pred.predicted_close,
-          upperBound: pred.upper_bound,
-          lowerBound: pred.lower_bound,
+          price: null,
+          predicted: parseNum(pred.predicted_close),
+          upperBound: parseNum(pred.upper_bound),
+          lowerBound: parseNum(pred.lower_bound),
         });
       }
     }
@@ -243,13 +270,21 @@ export default function InteractiveChart({
     : 0;
 
   // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean;
+    payload?: TooltipItem[];
+    label?: string;
+  }) => {
     if (!active || !payload || payload.length === 0) return null;
 
-    const priceVal = payload.find((p: any) => p.dataKey === 'price');
-    const predVal = payload.find((p: any) => p.dataKey === 'predicted');
-    const upperVal = payload.find((p: any) => p.dataKey === 'upperBound');
-    const lowerVal = payload.find((p: any) => p.dataKey === 'lowerBound');
+    const priceVal = payload.find((p) => p.dataKey === 'price');
+    const predVal = payload.find((p) => p.dataKey === 'predicted');
+    const upperVal = payload.find((p) => p.dataKey === 'upperBound');
+    const lowerVal = payload.find((p) => p.dataKey === 'lowerBound');
 
     return (
       <div className="bg-slate-900/95 border border-slate-700/50 rounded-xl px-5 py-4 shadow-2xl backdrop-blur-md ring-1 ring-white/10">
@@ -474,7 +509,10 @@ export default function InteractiveChart({
                 domain={['auto', 'auto']}
                 axisLine={false}
                 tickLine={false}
-                width={50}
+                width={55}
+                tickCount={6}
+                allowDecimals={true}
+                scale="linear"
               />
 
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={true} opacity={0.3} />
@@ -488,9 +526,11 @@ export default function InteractiveChart({
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#colorPrice)"
-                connectNulls={false}
+                connectNulls={true}
                 dot={false}
+                isAnimationActive={false}
               />
+
 
               {/* Confidence band (upper/lower) */}
               {showPrediction && prediction && (
@@ -501,8 +541,9 @@ export default function InteractiveChart({
                     stroke="none"
                     fillOpacity={1}
                     fill="url(#colorConfidence)"
-                    connectNulls={false}
+                    connectNulls={true}
                     dot={false}
+                    isAnimationActive={false}
                   />
                   <Area
                     type="monotone"
@@ -513,8 +554,9 @@ export default function InteractiveChart({
                     strokeOpacity={0.3}
                     fillOpacity={0}
                     fill="transparent"
-                    connectNulls={false}
+                    connectNulls={true}
                     dot={false}
+                    isAnimationActive={false}
                   />
                 </>
               )}
@@ -529,7 +571,8 @@ export default function InteractiveChart({
                   strokeDasharray="6 3"
                   dot={{ r: 3, fill: '#f59e0b', stroke: '#1e293b', strokeWidth: 2 }}
                   activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
-                  connectNulls={false}
+                  connectNulls={true}
+                  isAnimationActive={false}
                 />
               )}
             </ComposedChart>

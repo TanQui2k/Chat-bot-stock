@@ -20,6 +20,35 @@ from src.crud.crud_stock import create_predictions
 
 logger = logging.getLogger(__name__)
 
+
+def _patch_prophet_for_pandas3() -> None:
+    """
+    Prophet 1.1.x builds component matrices with duplicated row indexes.
+    pandas 3.x is stricter here and raises:
+    "cannot reindex on an axis with duplicate labels".
+
+    Resetting indexes during the component concat keeps Prophet compatible
+    without changing external dependencies at runtime.
+    """
+    if getattr(Prophet, "_stockai_pandas3_patch", False):
+        return
+
+    def _add_group_component(self, components, name, group):
+        new_comp = components[components['component'].isin(set(group))].copy()
+        group_cols = new_comp['col'].unique()
+        if len(group_cols) > 0:
+            new_comp = pd.DataFrame({'col': group_cols, 'component': name})
+            components = pd.concat([components, new_comp], ignore_index=True)
+        else:
+            components = components.reset_index(drop=True)
+        return components
+
+    Prophet.add_group_component = _add_group_component
+    Prophet._stockai_pandas3_patch = True
+
+
+_patch_prophet_for_pandas3()
+
 # ============================================================
 # Vietnamese Holidays
 # ============================================================
@@ -94,6 +123,54 @@ class ProphetService:
     """Service to train, save, load, and predict with Prophet models."""
 
     @staticmethod
+    def _prepare_price_frame(prices: list[DailyPrice], symbol: str) -> pd.DataFrame:
+        """
+        Normalize raw price rows for Prophet training/prediction.
+
+        Duplicate trading dates can happen after repeated imports. We keep the
+        latest row for each day so the forecasting model always sees a clean,
+        unique timeline.
+        """
+        df = pd.DataFrame([{
+            'row_id': p.id,
+            'ds': p.date,
+            'y': p.close,
+        } for p in prices])
+
+        if df.empty:
+            return pd.DataFrame(columns=['ds', 'y'])
+
+        df['ds'] = pd.to_datetime(df['ds'])
+        df.dropna(subset=['y'], inplace=True)
+        df.sort_values(['ds', 'row_id'], inplace=True)
+
+        duplicate_mask = df.duplicated(subset=['ds'], keep=False)
+        if duplicate_mask.any():
+            duplicate_days = int(df.loc[duplicate_mask, 'ds'].nunique())
+            duplicate_rows = int(duplicate_mask.sum())
+            logger.warning(
+                "Detected %s duplicate price rows across %s trading days for %s. "
+                "Keeping the latest row per day before forecasting.",
+                duplicate_rows,
+                duplicate_days,
+                symbol,
+            )
+            df = df.drop_duplicates(subset=['ds'], keep='last')
+
+        return df[['ds', 'y']].reset_index(drop=True)
+
+    @staticmethod
+    def _build_future_dataframe(model: Prophet, days: int) -> pd.DataFrame:
+        """Build the next N business dates from the model's latest history row."""
+        last_date = model.history['ds'].max()
+        future_dates = pd.bdate_range(
+            start=last_date + timedelta(days=1),
+            periods=days,
+            freq='B'
+        )
+        return pd.DataFrame({'ds': future_dates})
+
+    @staticmethod
     def _get_model_dir(symbol: str) -> str:
         path = os.path.join(MODELS_DIR, symbol.upper())
         os.makedirs(path, exist_ok=True)
@@ -124,21 +201,14 @@ class ProphetService:
         )
         prices = list(db.scalars(stmt_prices).all())
 
-        if len(prices) < 60:
+        # 3. Build a clean training frame
+        df = ProphetService._prepare_price_frame(prices, symbol)
+
+        if len(df) < 60:
             raise ValueError(
-                f"Not enough data for {symbol}: {len(prices)} rows "
+                f"Not enough unique trading days for {symbol}: {len(df)} rows "
                 f"(need at least 60 for reliable prediction)"
             )
-
-        # 3. Build DataFrame
-        df = pd.DataFrame([{
-            'ds': p.date,
-            'y': p.close,
-        } for p in prices])
-        df['ds'] = pd.to_datetime(df['ds'])
-        df.dropna(subset=['y'], inplace=True)
-        df.sort_values('ds', inplace=True)
-        df.reset_index(drop=True, inplace=True)
 
         # 4. Train Prophet (Pure — no regressors)
         hp = params or DEFAULT_PARAMS
@@ -239,19 +309,44 @@ class ProphetService:
         if model is None:
             raise RuntimeError(f"Failed to load model for {symbol}")
 
+        if model.history['ds'].duplicated().any():
+            if not auto_train:
+                raise ValueError(
+                    f"Stored model for {symbol} has duplicate training dates. Retrain the model first."
+                )
+            logger.warning(
+                "Stored Prophet model for %s has duplicate training dates. Re-training from cleaned price history.",
+                symbol,
+            )
+            metadata = ProphetService.train_model(db, symbol)
+            model = ProphetService.load_model(symbol)
+
+        if model is None:
+            raise RuntimeError(f"Failed to reload model for {symbol}")
+
         # 3. Create future dataframe for N business days
         # Prophet's make_future_dataframe includes historical dates too
         # We only want future dates, so we'll build manually
-        last_date = model.history['ds'].max()
-        future_dates = pd.bdate_range(
-            start=last_date + timedelta(days=1),
-            periods=days,
-            freq='B'  # Business days
-        )
-        future_df = pd.DataFrame({'ds': future_dates})
+        future_df = ProphetService._build_future_dataframe(model, days)
 
         # 4. Predict
-        forecast = model.predict(future_df)
+        try:
+            forecast = model.predict(future_df)
+        except ValueError as exc:
+            if auto_train and 'duplicate labels' in str(exc).lower():
+                logger.warning(
+                    "Prediction for %s failed because the stored model still had duplicate labels. "
+                    "Retrying after re-training from cleaned history.",
+                    symbol,
+                )
+                metadata = ProphetService.train_model(db, symbol)
+                model = ProphetService.load_model(symbol)
+                if model is None:
+                    raise RuntimeError(f"Failed to reload model for {symbol}") from exc
+                future_df = ProphetService._build_future_dataframe(model, days)
+                forecast = model.predict(future_df)
+            else:
+                raise
 
         # 5. Get recent historical prices for chart context (last 60 trading days)
         stmt = select(Ticker).where(Ticker.symbol == symbol)
@@ -262,15 +357,14 @@ class ProphetService:
             stmt_prices = (
                 select(DailyPrice)
                 .where(DailyPrice.ticker_id == ticker.id)
-                .order_by(DailyPrice.date.desc())
-                .limit(60)
+                .order_by(DailyPrice.date.asc(), DailyPrice.id.asc())
             )
             prices = list(db.scalars(stmt_prices).all())
-            prices.reverse()
+            history_df = ProphetService._prepare_price_frame(prices, symbol).tail(60)
             history_data = [{
-                'date': p.date.isoformat(),
-                'close': float(p.close) if p.close else None,
-            } for p in prices]
+                'date': row.ds.date().isoformat(),
+                'close': float(row.y),
+            } for row in history_df.itertuples(index=False)]
 
         # 6. Build response
         predictions = []
