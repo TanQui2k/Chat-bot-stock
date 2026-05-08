@@ -64,6 +64,29 @@ interface ChartPoint {
 }
 
 const popularTickers = ['FPT', 'VNM', 'MSN', 'VPB', 'ACB', 'HPG', 'VIC', 'VCB'];
+const timeframeWindow: Record<string, number> = {
+  '1D': 2,
+  '1W': 5,
+  '1M': 22,
+  '1Y': 252,
+};
+
+async function getResponseError(res: Response, fallback: string): Promise<string> {
+  try {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const body = await res.json() as { detail?: string };
+      if (body.detail) return body.detail;
+    }
+
+    const text = (await res.text()).trim();
+    if (text) return text;
+  } catch {
+    // Ignore parsing errors and fall back to the default message.
+  }
+
+  return fallback;
+}
 
 export default function InteractiveChart({
   symbol,
@@ -86,6 +109,15 @@ export default function InteractiveChart({
   const [predLoading, setPredLoading] = useState(false);
   const [showPrediction, setShowPrediction] = useState(true);
 
+  const parseNum = (val: unknown): number => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+      const normalized = val.replace(',', '.').replace(/[^-0-9.]/g, '');
+      return parseFloat(normalized) || 0;
+    }
+    return 0;
+  };
+
   // Fetch all tickers from database
   useEffect(() => {
     let isMounted = true;
@@ -100,9 +132,14 @@ export default function InteractiveChart({
               name: t.name || t.company_name || 'Công ty Cổ phần ' + t.symbol
             })));
           }
+        } else if (isMounted) {
+          setAllTickers([]);
         }
       } catch (err) {
-        console.error("Failed to load tickers", err);
+        if (isMounted) {
+          setAllTickers([]);
+        }
+        console.warn("Unable to load tickers", err);
       }
     };
     fetchTickers();
@@ -155,6 +192,16 @@ export default function InteractiveChart({
         setLoading(true);
         setError(null);
         const res = await fetch(`${API_BASE_URL}/stocks/${symbol}/history`);
+        const responseError =
+          !res.ok
+            ? await getResponseError(
+                res,
+                "Lá»—i táº£i dá»¯ liá»‡u hoáº·c mÃ£ khÃ´ng tá»“n táº¡i!"
+              )
+            : null;
+        if (responseError) {
+          throw new Error(responseError);
+        }
         if (!res.ok) throw new Error("Lỗi tải dữ liệu hoặc mã không tồn tại!");
 
         const json = await res.json();
@@ -189,7 +236,7 @@ export default function InteractiveChart({
           if (isMounted) setPrediction(null);
         }
       } catch (err) {
-        console.error("Prediction fetch failed:", err);
+        console.warn("Prediction fetch failed:", err);
         if (isMounted) setPrediction(null);
       } finally {
         if (isMounted) setPredLoading(false);
@@ -199,20 +246,42 @@ export default function InteractiveChart({
     return () => { isMounted = false; };
   }, [symbol]);
 
+  const normalizedHistoryData = (() => {
+    const sorted = [...data].sort((a, b) => {
+      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      return dateDiff !== 0 ? dateDiff : a.id - b.id;
+    });
+
+    const byDate = new Map<string, PriceData>();
+    for (const item of sorted) {
+      byDate.set(item.date, item);
+    }
+
+    return Array.from(byDate.values()).sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  })();
+
+  const historyWindow = timeframeWindow[timeframe] ?? normalizedHistoryData.length;
+  const visibleHistoryData = normalizedHistoryData.slice(-historyWindow);
+  const latestHistoryDate = normalizedHistoryData.length > 0
+    ? normalizedHistoryData[normalizedHistoryData.length - 1].date
+    : null;
+
+  const futurePredictions = (() => {
+    if (!showPrediction || !prediction?.predictions?.length || !latestHistoryDate) return [];
+
+    const latestHistoryTime = new Date(latestHistoryDate).getTime();
+    return prediction.predictions
+      .filter((item) => new Date(item.date).getTime() > latestHistoryTime)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  })();
+
+  const hasFuturePredictions = futurePredictions.length > 0;
+
   // Merge historical data + prediction into single chart dataset
   const chartData = (() => {
-    // Helper to safely parse numbers from potential localized strings
-    const parseNum = (val: unknown): number => {
-      if (typeof val === 'number') return val;
-      if (typeof val === 'string') {
-        const normalized = val.replace(',', '.').replace(/[^-0-9.]/g, '');
-        return parseFloat(normalized) || 0;
-      }
-      return 0;
-    };
-
-    // 1. Historical data points - ensure we have a fresh copy and sort by date 
-    const historyPoints: ChartPoint[] = data.map(item => ({
+    const historyPoints: ChartPoint[] = visibleHistoryData.map(item => ({
       date: new Date(item.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
       fullDate: item.date,
       price: parseNum(item.close),
@@ -222,15 +291,13 @@ export default function InteractiveChart({
     }));
 
     // 2. Prediction data merging
-    if (showPrediction && prediction && prediction.predictions.length > 0) {
-      // Find the bridge point in history to start prediction from
+    if (hasFuturePredictions) {
       if (historyPoints.length > 0) {
         const lastPoint = historyPoints[historyPoints.length - 1];
         lastPoint.predicted = lastPoint.price;
       }
 
-      // Add actual prediction points
-      for (const pred of prediction.predictions) {
+      for (const pred of futurePredictions) {
         historyPoints.push({
           date: new Date(pred.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
           fullDate: pred.date,
@@ -245,18 +312,22 @@ export default function InteractiveChart({
     return historyPoints;
   })();
 
-  const latestPrice = data.length > 0 ? (data[data.length - 1].close || 0) : 0;
-  const prevPrice = data.length > 1 ? (data[data.length - 2].close || 0) : 0;
+  const latestPrice = normalizedHistoryData.length > 0
+    ? parseNum(normalizedHistoryData[normalizedHistoryData.length - 1].close)
+    : 0;
+  const prevPrice = normalizedHistoryData.length > 1
+    ? parseNum(normalizedHistoryData[normalizedHistoryData.length - 2].close)
+    : 0;
   const diff = latestPrice - prevPrice;
   const pct = prevPrice > 0 ? (diff / prevPrice) * 100 : 0;
 
 
 
   // Prediction summary info
-  const predSummary = prediction?.predictions?.length
+  const predSummary = hasFuturePredictions
     ? {
-      lastPred: prediction.predictions[prediction.predictions.length - 1],
-      firstPred: prediction.predictions[0],
+      lastPred: futurePredictions[futurePredictions.length - 1],
+      firstPred: futurePredictions[0],
       mape: prediction.metrics?.mape,
     }
     : null;
@@ -336,8 +407,23 @@ export default function InteractiveChart({
               </button>
 
               {showTickerMenu && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-card/95 border border-border/80 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 backdrop-blur-xl flex flex-col">
-                  <div className="p-2.5 border-b border-border bg-card/60">
+                <div
+                  className="absolute top-full left-0 mt-2 w-64 rounded-xl shadow-[0_20px_60px_rgba(2,6,23,0.55)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 isolate"
+                  style={{
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid color-mix(in oklab, var(--border) 90%, transparent)',
+                  }}
+                >
+                  <div
+                    className="absolute inset-0"
+                    aria-hidden="true"
+                    style={{ backgroundColor: 'var(--card)' }}
+                  />
+                  <div className="relative z-10 flex flex-col">
+                  <div
+                    className="p-2.5 border-b"
+                    style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)' }}
+                  >
                     <div className="relative flex items-center gap-1.5">
                       <input
                         ref={searchInputRef}
@@ -345,18 +431,28 @@ export default function InteractiveChart({
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         placeholder="Tìm mã hoặc tên công ty..."
-                        className="w-full px-3 py-2 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:border-violet-500 transition-all text-foreground"
+                        className="w-full px-3 py-2 text-xs bg-muted/90 border border-border rounded-lg focus:outline-none focus:border-violet-500 transition-all text-foreground"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleSearch();
                         }}
                       />
                     </div>
                   </div>
-                  <div className="px-3 py-2 border-b border-border bg-card/40 text-xs font-semibold text-muted-foreground uppercase tracking-widest flex justify-between">
+                  <div
+                    className="px-3 py-2 border-b text-xs font-semibold uppercase tracking-widest flex justify-between"
+                    style={{
+                      backgroundColor: 'color-mix(in oklab, var(--secondary) 70%, var(--card))',
+                      borderColor: 'var(--border)',
+                      color: 'var(--muted-foreground)',
+                    }}
+                  >
                     <span>{searchTerm ? 'Kết quả tìm kiếm' : 'Nổi bật'}</span>
                     {searchTerm && <span className="text-violet-400">{displayResults.length}</span>}
                   </div>
-                  <div className="max-h-60 overflow-y-auto">
+                  <div
+                    className="max-h-60 overflow-y-auto"
+                    style={{ backgroundColor: 'var(--card)' }}
+                  >
                     {displayResults.length > 0 ? displayResults.map((item) => (
                       <button
                         key={item.symbol}
@@ -366,9 +462,15 @@ export default function InteractiveChart({
                           setSearchTerm("");
                         }}
                         className={`w-full px-4 py-2.5 text-left text-sm transition-colors flex justify-between items-center group ${symbol === item.symbol
-                          ? 'bg-violet-500/10 text-violet-400'
-                          : 'text-foreground/80 hover:bg-muted'
+                          ? 'bg-violet-500/15 text-violet-300'
+                          : 'hover:bg-muted/90'
                           }`}
+                        style={symbol === item.symbol
+                          ? undefined
+                          : {
+                            backgroundColor: 'var(--card)',
+                            color: 'color-mix(in oklab, var(--foreground) 82%, transparent)',
+                          }}
                       >
                         <div className="flex flex-col gap-0.5">
                           <span className="font-bold flex items-center gap-2 text-sm">{item.symbol}</span>
@@ -379,10 +481,17 @@ export default function InteractiveChart({
                         )}
                       </button>
                     )) : (
-                      <div className="px-4 py-6 text-center text-muted-foreground text-xs">
+                      <div
+                        className="px-4 py-6 text-center text-xs"
+                        style={{
+                          backgroundColor: 'var(--card)',
+                          color: 'var(--muted-foreground)',
+                        }}
+                      >
                         Không tìm thấy &quot;{searchTerm}&quot;
                       </div>
                     )}
+                  </div>
                   </div>
                 </div>
               )}
@@ -482,7 +591,7 @@ export default function InteractiveChart({
           </div>
         ) : error ? (
           <div className="flex items-center justify-center flex-1 text-rose-500 text-sm">{error}</div>
-        ) : data.length === 0 ? (
+        ) : normalizedHistoryData.length === 0 ? (
           <div className="flex items-center justify-center flex-1 text-muted-foreground text-sm">Chưa có dữ liệu giao dịch.</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -533,7 +642,7 @@ export default function InteractiveChart({
 
 
               {/* Confidence band (upper/lower) */}
-              {showPrediction && prediction && (
+              {hasFuturePredictions && (
                 <>
                   <Area
                     type="monotone"
@@ -562,7 +671,7 @@ export default function InteractiveChart({
               )}
 
               {/* Prediction line */}
-              {showPrediction && prediction && (
+              {hasFuturePredictions && (
                 <Line
                   type="monotone"
                   dataKey="predicted"
@@ -583,11 +692,11 @@ export default function InteractiveChart({
       <div className="border-t border-border/60 bg-card/50 px-4 py-2 flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex gap-4">
           <span>Timeframe: {timeframe}</span>
-          <span>Datapoints: {data.length}</span>
-          {showPrediction && prediction && (
+          <span>Datapoints: {chartData.length}</span>
+          {hasFuturePredictions && (
             <span className="text-amber-400/70 flex items-center gap-1">
               <span className="w-3 h-0 border-t-2 border-dashed border-amber-400 inline-block"></span>
-              Prophet Forecast: {prediction.predictions.length} phiên
+              Prophet Forecast: {futurePredictions.length} phiên
             </span>
           )}
         </div>

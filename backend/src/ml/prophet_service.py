@@ -123,6 +123,41 @@ class ProphetService:
     """Service to train, save, load, and predict with Prophet models."""
 
     @staticmethod
+    def _get_ticker(db: Session, symbol: str) -> Ticker | None:
+        stmt = select(Ticker).where(Ticker.symbol == symbol)
+        return db.scalars(stmt).first()
+
+    @staticmethod
+    def _get_latest_price_date(db: Session, ticker_id: int) -> date | None:
+        stmt = (
+            select(DailyPrice.date)
+            .where(DailyPrice.ticker_id == ticker_id)
+            .order_by(DailyPrice.date.desc(), DailyPrice.id.desc())
+            .limit(1)
+        )
+        return db.execute(stmt).scalar_one_or_none()
+
+    @staticmethod
+    def _get_model_history_end_date(
+        model: Prophet | None,
+        metadata: dict | None,
+    ) -> date | None:
+        if metadata:
+            end_date = metadata.get('date_range', {}).get('end')
+            if end_date:
+                try:
+                    return date.fromisoformat(end_date)
+                except ValueError:
+                    logger.warning("Invalid metadata end date for Prophet model: %s", end_date)
+
+        if model is not None and hasattr(model, 'history') and not model.history.empty:
+            model_last_ds = model.history['ds'].max()
+            if pd.notna(model_last_ds):
+                return pd.Timestamp(model_last_ds).date()
+
+        return None
+
+    @staticmethod
     def _prepare_price_frame(prices: list[DailyPrice], symbol: str) -> pd.DataFrame:
         """
         Normalize raw price rows for Prophet training/prediction.
@@ -188,8 +223,7 @@ class ProphetService:
         logger.info(f"Training Prophet model for {symbol}...")
 
         # 1. Fetch ticker
-        stmt = select(Ticker).where(Ticker.symbol == symbol)
-        ticker = db.scalars(stmt).first()
+        ticker = ProphetService._get_ticker(db, symbol)
         if not ticker:
             raise ValueError(f"Ticker '{symbol}' not found in database")
 
@@ -294,6 +328,14 @@ class ProphetService:
         """
         symbol = symbol.upper()
 
+        ticker = ProphetService._get_ticker(db, symbol)
+        if not ticker:
+            raise ValueError(f"Ticker '{symbol}' not found in database")
+
+        latest_history_date = ProphetService._get_latest_price_date(db, ticker.id)
+        if latest_history_date is None:
+            raise ValueError(f"No historical prices found for {symbol}")
+
         # 1. Try to load existing model
         model = ProphetService.load_model(symbol)
         metadata = ProphetService.get_metadata(symbol)
@@ -308,6 +350,26 @@ class ProphetService:
 
         if model is None:
             raise RuntimeError(f"Failed to load model for {symbol}")
+
+        model_history_end = ProphetService._get_model_history_end_date(model, metadata)
+        if model_history_end is None or model_history_end < latest_history_date:
+            if not auto_train:
+                raise ValueError(
+                    f"Stored model for {symbol} is stale. Latest DB date is {latest_history_date.isoformat()}, "
+                    f"but the model only knows data through {model_history_end.isoformat() if model_history_end else 'unknown'}."
+                )
+
+            logger.info(
+                "Model for %s is stale. Re-training with latest DB history (%s > %s).",
+                symbol,
+                latest_history_date.isoformat(),
+                model_history_end.isoformat() if model_history_end else 'unknown',
+            )
+            metadata = ProphetService.train_model(db, symbol)
+            model = ProphetService.load_model(symbol)
+
+        if model is None:
+            raise RuntimeError(f"Failed to reload model for {symbol}")
 
         if model.history['ds'].duplicated().any():
             if not auto_train:
@@ -349,9 +411,6 @@ class ProphetService:
                 raise
 
         # 5. Get recent historical prices for chart context (last 60 trading days)
-        stmt = select(Ticker).where(Ticker.symbol == symbol)
-        ticker = db.scalars(stmt).first()
-
         history_data = []
         if ticker:
             stmt_prices = (

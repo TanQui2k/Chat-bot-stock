@@ -17,7 +17,7 @@ export interface PhoneVerificationVerify {
 }
 
 export interface GoogleLoginRequest {
-  id_token: string;
+  access_token: string;
 }
 
 export interface AuthUser {
@@ -37,6 +37,7 @@ export interface AuthUser {
 }
 
 export interface AuthResponse {
+  message: string;
   access_token: string;
   token_type: string;
   user: AuthUser;

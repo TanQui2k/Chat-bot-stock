@@ -1,39 +1,65 @@
-from fastapi import FastAPI
+import logging
+import os
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.routes import stocks, chat, predict, assistant, auth, anomaly
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError
+
+from src.api.routes import anomaly, assistant, auth, chat, predict, stocks
 from src.middleware.rate_limiter import RateLimitMiddleware
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="StockAI Predictor API",
     description="API for StockAI Predictor Application",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # ==========================================
-# Middleware Stack (order matters: last added = first executed)
+# Middleware Stack
 # ==========================================
 
-# 1. CORS — Chỉ cho phép origins đã biết, không dùng wildcard cho credentials
-import os
+# 1. Rate limiter protects selected sensitive endpoints.
+app.add_middleware(RateLimitMiddleware)
 
-# Production: đọc từ biến môi trường ALLOWED_ORIGINS (comma-separated)
-# Development: cho phép localhost
+# 2. CORS stays outermost so even error responses keep CORS headers.
 _default_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
 _env_origins = os.environ.get("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else _default_origins
+LOCAL_DEV_ORIGIN_REGEX = (
+    r"^https?://("
+    r"localhost|127\.0\.0\.1|"
+    r"192\.168\.\d{1,3}\.\d{1,3}|"
+    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+    r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
+    r"):3000$"
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=None if _env_origins else LOCAL_DEV_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],  # Chỉ định rõ thay vì wildcard
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],  # Chỉ các header cần thiết
-    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining"],  # Cho phép frontend đọc rate limit headers
-    max_age=600,  # Cache preflight requests 10 phút
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining"],
+    max_age=600,
 )
 
-# 2. Rate Limiter — Bảo vệ endpoints nhạy cảm (OTP, login)
-app.add_middleware(RateLimitMiddleware)
+
+@app.exception_handler(OperationalError)
+async def operational_error_handler(request: Request, exc: OperationalError):
+    logger.exception("Database operation failed for %s", request.url.path, exc_info=exc)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Database connection failed. Check PostgreSQL credentials in backend/.env.",
+            "error_code": "database_unavailable",
+        },
+    )
+
 
 # ==========================================
 # Routes
@@ -45,7 +71,7 @@ app.include_router(assistant.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(anomaly.router, prefix="/api", tags=["Anomaly Detection"])
 
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to StockAI API"}
-

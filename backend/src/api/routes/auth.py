@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Header
+from fastapi import APIRouter, HTTPException, Depends, status, Header, Cookie
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
@@ -94,6 +94,8 @@ def verify_phone_code(
     
     response = JSONResponse(content={
         "message": "Login successful",
+        "access_token": token,
+        "token_type": "bearer",
         "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
     })
     set_auth_cookie(response, token)
@@ -126,6 +128,8 @@ async def google_login(
     
     response = JSONResponse(content={
         "message": "Google login successful",
+        "access_token": token,
+        "token_type": "bearer",
         "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
     })
     set_auth_cookie(response, token)
@@ -175,6 +179,8 @@ def register(
     
     response = JSONResponse(content={
         "message": "Registration successful",
+        "access_token": token,
+        "token_type": "bearer",
         "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
     }, status_code=status.HTTP_201_CREATED)
     
@@ -206,6 +212,8 @@ def login(
     
     response = JSONResponse(content={
         "message": "Login successful",
+        "access_token": token,
+        "token_type": "bearer",
         "user": schemas.UserResponse.model_validate(user).model_dump(mode='json')
     })
     set_auth_cookie(response, token)
@@ -214,17 +222,25 @@ def login(
 @router.post("/logout")
 def logout(
     authorization: str = Depends(lambda authorization=Header(None): authorization),
+    access_token: str | None = Cookie(None),
     current_user: schemas.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Logout current user and invalidate JWT token."""
     from src.services.token_blacklist import blacklist_token
     
+    token = None
     if authorization:
         token = authorization[7:] if authorization.startswith("Bearer ") else authorization
+    elif access_token:
+        token = access_token
+
+    if token:
         blacklist_token(token)
     
-    return {"message": "Logged out successfully"}
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    response.delete_cookie(key="access_token", path="/")
+    return response
 
 # ==========================================
 # User Profile

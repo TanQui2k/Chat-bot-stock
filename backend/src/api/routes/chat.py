@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -18,6 +21,31 @@ from src.utils.helpers import format_context_for_llm
 import re
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+class LegacyChatRequest(BaseModel):
+    message: str
+
+
+class LegacyChatResponse(BaseModel):
+    content: str
+    timestamp: str
+
+
+@router.post("/message", response_model=LegacyChatResponse)
+def send_message(payload: LegacyChatRequest):
+    """Compatibility endpoint for older frontend clients that send stateless chat messages."""
+    user_text = (payload.message or "").strip()
+    if not user_text:
+        raise HTTPException(status_code=400, detail="message is required")
+
+    from src.services.chat_service import ChatService
+
+    assistant_text = ChatService().route_intent(user_text, history=[])
+    return LegacyChatResponse(
+        content=assistant_text,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
 
 @router.post("/sessions", response_model=SessionResponse)
 def create_session(session: SessionCreate, db: Session = Depends(get_db)):
