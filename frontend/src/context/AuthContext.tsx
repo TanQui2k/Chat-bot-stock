@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { authApi, AuthUser, AuthResponse } from "@/lib/api";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
@@ -13,7 +13,6 @@ interface AuthContextType {
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (isOpen: boolean) => void;
 }
-
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
@@ -30,7 +29,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const profile = await authApi.getProfile();
         setUser(profile);
       } catch {
-        // Not logged in or session expired - silent failure during init
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -57,44 +55,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const showAuthModal = () => setIsAuthModalOpen(true);
 
-  if (!GOOGLE_CLIENT_ID) {
-    return (
-      <AuthContext.Provider 
-        value={{ 
-          user, 
-          isLoading, 
-          login, 
-          logout, 
-          showAuthModal, 
-          isAuthModalOpen, 
-          setIsAuthModalOpen 
-        }}
-      >
-        <div className="bg-amber-900/20 border border-amber-500/50 p-4 rounded-lg m-4 text-amber-200 text-sm">
-          <strong>Lỗi cấu hình:</strong> Cần đặt biến môi trường <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> để sử dụng tính năng Google Auth.
-        </div>
-        {children}
-      </AuthContext.Provider>
-    );
-  }
+  const contextValue = {
+    user,
+    isLoading,
+    login,
+    logout,
+    showAuthModal,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+  };
 
-  return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <AuthContext.Provider 
-        value={{ 
-          user, 
-          isLoading, 
-          login, 
-          logout, 
-          showAuthModal, 
-          isAuthModalOpen, 
-          setIsAuthModalOpen 
-        }}
-      >
-        {children}
-      </AuthContext.Provider>
-    </GoogleOAuthProvider>
+  const content = (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
   );
+
+  return GOOGLE_CLIENT_ID ? (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      {content}
+    </GoogleOAuthProvider>
+  ) : content;
 };
 
 export const useAuth = () => {

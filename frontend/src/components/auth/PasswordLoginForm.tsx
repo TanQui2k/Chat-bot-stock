@@ -25,12 +25,12 @@ const PasswordLoginForm: React.FC<{
     setError("");
 
     try {
-      let response;
+      let response: AuthResponse;
       if (isRegister) {
         const isEmail = identifier.includes("@");
         response = await authApi.register(
-          isEmail ? identifier : undefined, 
-          password, 
+          isEmail ? identifier : undefined,
+          password,
           fullName,
           !isEmail ? identifier : undefined
         );
@@ -53,7 +53,7 @@ const PasswordLoginForm: React.FC<{
           {isRegister ? "Đăng ký tài khoản" : "Đăng nhập với mật khẩu"}
         </h3>
         <p className="text-sm text-slate-500 mt-2">
-          {isRegister 
+          {isRegister
             ? "Tạo tài khoản mới để bắt đầu sử dụng"
             : "Nhập email hoặc số điện thoại và mật khẩu của bạn"}
         </p>
@@ -80,6 +80,7 @@ const PasswordLoginForm: React.FC<{
             />
           </div>
         )}
+
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             Email hoặc Số điện thoại
@@ -92,6 +93,7 @@ const PasswordLoginForm: React.FC<{
             className="w-full px-4 py-3.5 border-2 border-slate-200 rounded-xl focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 transition-all outline-none text-slate-700 placeholder:text-slate-400"
           />
         </div>
+
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             Mật khẩu
@@ -122,6 +124,7 @@ const PasswordLoginForm: React.FC<{
             </button>
           </div>
         </div>
+
         <button
           onClick={handleSubmit}
           disabled={loading}
@@ -138,10 +141,13 @@ const PasswordLoginForm: React.FC<{
           ) : (
             <span className="flex items-center justify-center gap-2">
               {isRegister ? "Đăng ký" : "Đăng nhập"}{" "}
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </span>
           )}
         </button>
+
         <div className="text-center space-y-2">
           <p className="text-sm text-slate-500">
             {isRegister ? "Đã có tài khoản?" : "Chưa có tài khoản?"}{" "}

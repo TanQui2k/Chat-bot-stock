@@ -39,17 +39,6 @@ export default function ChatInput({ input, setInput, isLoading, onSend }: ChatIn
         />
         <div className="flex items-center gap-2 pr-1 pb-2">
           <button
-            className="p-2.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            title="Voice Input"
-          >
-            <svg viewBox="0 0 24 24" className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          </button>
-          <button
             onClick={onSend}
             disabled={!input.trim() || isLoading}
             className={`p-2.5 rounded-full transition-all shadow-lg cursor-pointer ${
@@ -57,6 +46,7 @@ export default function ChatInput({ input, setInput, isLoading, onSend }: ChatIn
                 ? 'bg-emerald-500 text-white hover:bg-emerald-400 hover:scale-105 active:scale-95'
                 : 'bg-muted text-muted-foreground opacity-50'
             }`}
+            aria-label="Gửi tin nhắn"
           >
             <svg
               viewBox="0 0 24 24"

@@ -1,25 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { AuthResponse } from "@/lib/api";
-import { authApi } from "@/lib/api";
 import { useGoogleLogin } from "@react-oauth/google";
 import { toast } from "sonner";
 
+import { AuthResponse, authApi } from "@/lib/api";
 import GoogleLoginButton from "@/components/auth/GoogleLoginButton";
 import PhoneLoginForm from "@/components/auth/PhoneLoginForm";
 import PasswordLoginForm from "@/components/auth/PasswordLoginForm";
 
-export const AuthModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+
+function GoogleLoginAction({
+  googleLoading,
+  setGoogleLoading,
+  onSuccess,
+}: {
+  googleLoading: boolean;
+  setGoogleLoading: (loading: boolean) => void;
   onSuccess: (response: AuthResponse) => void;
-}> = ({ isOpen, onClose, onSuccess }) => {
-  const [authMode, setAuthMode] = useState<"selection" | "phone" | "password">("selection");
-  const [googleLoading, setGoogleLoading] = useState(false);
-
-  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-
+}) {
   const triggerGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
@@ -36,27 +36,36 @@ export const AuthModal: React.FC<{
     onError: () => toast.error("Đăng nhập Google thất bại. Vui lòng thử lại."),
   });
 
-  const handleGoogleClick = () => {
-    if (!GOOGLE_CLIENT_ID) {
-      toast.error("Chưa cấu hình Google Client ID trong file .env");
-      return;
-    }
-    triggerGoogleLogin();
-  };
+  return (
+    <GoogleLoginButton
+      onClick={() => triggerGoogleLogin()}
+      isLoading={googleLoading}
+    />
+  );
+}
+
+export const AuthModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (response: AuthResponse) => void;
+}> = ({ isOpen, onClose, onSuccess }) => {
+  const [authMode, setAuthMode] = useState<"selection" | "phone" | "password">("selection");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleMissingGoogleConfig = () => {
+    toast.error("Chưa cấu hình NEXT_PUBLIC_GOOGLE_CLIENT_ID trong file .env.");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop with blur */}
       <div
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div className="relative w-full max-w-md bg-white/90 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl shadow-violet-500/20 overflow-hidden animate-in zoom-in-95 duration-300">
-        {/* Gradient Header */}
         <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 px-8 py-10 text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl"></div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/20 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl"></div>
@@ -70,22 +79,21 @@ export const AuthModal: React.FC<{
               <h2 className="text-3xl font-bold text-white tracking-tight">StockAI</h2>
             </div>
             <p className="text-violet-100 text-sm font-medium">
-              Trợ lý AI Chứng khoán thông minh
+              Trợ lý AI chứng khoán thông minh
             </p>
           </div>
         </div>
 
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full text-white/80 hover:text-white transition-all duration-300 backdrop-blur-sm"
+          aria-label="Đóng"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
-        {/* Content */}
         <div className="p-8">
           {authMode === "selection" && (
             <div className="text-center space-y-6">
@@ -93,10 +101,18 @@ export const AuthModal: React.FC<{
                 Chọn phương thức đăng nhập để tiếp tục
               </p>
               <div className="space-y-4">
-                <GoogleLoginButton
-                  onClick={handleGoogleClick}
-                  isLoading={googleLoading}
-                />
+                {GOOGLE_CLIENT_ID ? (
+                  <GoogleLoginAction
+                    googleLoading={googleLoading}
+                    setGoogleLoading={setGoogleLoading}
+                    onSuccess={onSuccess}
+                  />
+                ) : (
+                  <GoogleLoginButton
+                    onClick={handleMissingGoogleConfig}
+                    isLoading={false}
+                  />
+                )}
 
                 <div className="relative flex items-center py-2">
                   <div className="flex-grow border-t border-slate-200"></div>
@@ -164,7 +180,6 @@ export const AuthModal: React.FC<{
           )}
         </div>
 
-        {/* Footer */}
         <div className="bg-slate-50/50 px-8 py-4 text-center text-xs text-slate-500">
           Bằng cách đăng nhập, bạn đồng ý với{" "}
           <a href="#" className="text-violet-600 hover:text-violet-700 font-medium hover:underline">

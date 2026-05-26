@@ -192,17 +192,12 @@ export default function InteractiveChart({
         setLoading(true);
         setError(null);
         const res = await fetch(`${API_BASE_URL}/stocks/${symbol}/history`);
-        const responseError =
-          !res.ok
-            ? await getResponseError(
-                res,
-                "Lá»—i táº£i dá»¯ liá»‡u hoáº·c mÃ£ khÃ´ng tá»“n táº¡i!"
-              )
-            : null;
+        const responseError = !res.ok
+          ? await getResponseError(res, "Lỗi tải dữ liệu hoặc mã không tồn tại!")
+          : null;
         if (responseError) {
           throw new Error(responseError);
         }
-        if (!res.ok) throw new Error("Lỗi tải dữ liệu hoặc mã không tồn tại!");
 
         const json = await res.json();
         if (isMounted) setData(json);
@@ -328,7 +323,7 @@ export default function InteractiveChart({
     ? {
       lastPred: futurePredictions[futurePredictions.length - 1],
       firstPred: futurePredictions[0],
-      mape: prediction.metrics?.mape,
+      mape: prediction?.metrics?.mape,
     }
     : null;
 

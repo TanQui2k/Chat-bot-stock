@@ -2,23 +2,23 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { chatService, Message, generateUUID } from '@/services/chatService';
+import { chatService, Message } from '@/services/chatService';
 import ChatMessageItem from './chat/ChatMessageItem';
 import ChatWelcome from './chat/ChatWelcome';
 import ChatInput from './chat/ChatInput';
 
 export default function ChatInterface() {
-  const { user } = useAuth();
+  const { user, showAuthModal } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   };
 
@@ -27,38 +27,56 @@ export default function ChatInterface() {
   }, [messages]);
 
   const initSession = useCallback(async () => {
+    if (!user?.id) return null;
+
     try {
-      const userId = user?.id || generateUUID();
-      const id = await chatService.initSession(userId);
-      if (id) setSessionId(id);
+      const id = await chatService.initSession(user.id);
+      setSessionId(id);
       return id;
     } catch (err) {
-      console.error("Failed to init chat session", err);
+      console.error('Failed to init chat session', err);
+      return null;
     }
-    return null;
   }, [user?.id]);
 
   useEffect(() => {
-    initSession();
-  }, [initSession]);
+    setMessages([]);
+    setSessionId(null);
+
+    if (user?.id) {
+      void initSession();
+    }
+  }, [initSession, user?.id]);
 
   const handleSend = async (forcedInput?: string) => {
     const textToSend = forcedInput || input.trim();
     if (!textToSend || isLoading) return;
 
+    if (!user?.id) {
+      showAuthModal();
+      return;
+    }
+
     let currentSessionId = sessionId;
-    
+
     if (!currentSessionId) {
       currentSessionId = await initSession();
     }
 
     if (!currentSessionId) {
-      alert("Kết nối AI đang bận (Lỗi 422/UUID). Vui lòng tải lại trang!");
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: 'assistant',
+          content: 'Không thể tạo phiên chat. Vui lòng thử lại sau.',
+        },
+      ]);
       return;
     }
-    
+
     if (!forcedInput) setInput('');
-    
+
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: textToSend };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
@@ -66,25 +84,33 @@ export default function ChatInterface() {
     try {
       const assistantMsg = await chatService.sendMessage(currentSessionId, textToSend);
       setMessages(prev => [...prev, assistantMsg]);
-    } catch {
-      setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: "Có lỗi xảy ra khi kết nối với AI." }]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Có lỗi xảy ra khi kết nối với AI.';
+      setMessages(prev => [
+        ...prev,
+        { id: `err-${Date.now()}`, role: 'assistant', content: message },
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNewChat = () => {
+    if (!user?.id) {
+      showAuthModal();
+      return;
+    }
+
     setMessages([]);
     setSessionId(null);
     setInput('');
-    initSession();
+    void initSession();
   };
 
   return (
     <div className={`flex flex-col h-full bg-background text-foreground overflow-hidden relative ${
       messages.length === 0 ? 'justify-center items-center px-4' : ''
     }`}>
-      
       {messages.length > 0 && (
         <div className="absolute top-4 left-4 z-50">
           <button
@@ -99,20 +125,20 @@ export default function ChatInterface() {
           </button>
         </div>
       )}
-      
+
       {messages.length > 0 && (
         <div className="flex-1 w-full overflow-y-auto px-4 md:px-10 space-y-6 pb-4 pt-10 scrollbar-hide">
           <div className="max-w-3xl mx-auto space-y-6">
             {messages.map((msg) => (
-               <ChatMessageItem key={msg.id} message={msg} />
+              <ChatMessageItem key={msg.id} message={msg} />
             ))}
             {isLoading && (
               <div className="flex flex-col items-start px-2">
-                 <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-emerald-500/50 rounded-full animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 bg-emerald-500/50 rounded-full animate-bounce delay-150"></span>
-                    <span className="w-1.5 h-1.5 bg-emerald-500/50 rounded-full animate-bounce delay-300"></span>
-                 </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-emerald-500/50 rounded-full animate-bounce"></span>
+                  <span className="w-1.5 h-1.5 bg-emerald-500/50 rounded-full animate-bounce delay-150"></span>
+                  <span className="w-1.5 h-1.5 bg-emerald-500/50 rounded-full animate-bounce delay-300"></span>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -124,21 +150,18 @@ export default function ChatInterface() {
         messages.length > 0 ? 'pb-4 pt-4 border-t border-border bg-card/30 shrink-0' : 'flex flex-col items-center flex-none mt-16'
       }`}>
         <div className="max-w-3xl mx-auto flex flex-col items-center w-full">
-          
           {!messages.length && (
             <ChatWelcome onSuggestionClick={(action) => handleSend(action)} />
           )}
 
-          <ChatInput 
-            input={input} 
-            setInput={setInput} 
-            isLoading={isLoading} 
-            onSend={() => handleSend()} 
+          <ChatInput
+            input={input}
+            setInput={setInput}
+            isLoading={isLoading}
+            onSend={() => handleSend()}
           />
-
         </div>
       </div>
-
     </div>
   );
 }

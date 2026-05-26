@@ -31,13 +31,9 @@ const PhoneLoginForm: React.FC<{
     setError("");
 
     try {
-      let response;
-      if (isRegister) {
-        response = await authApi.register(undefined, password, fullName, phoneNumber);
-      } else {
-        // Just use general login since it handles both phone and email
-        response = await authApi.login(phoneNumber, password);
-      }
+      const response = isRegister
+        ? await authApi.register(undefined, password, fullName, phoneNumber)
+        : await authApi.login(phoneNumber, password);
       onSuccess(response);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Thao tác thất bại";
@@ -79,6 +75,7 @@ const PhoneLoginForm: React.FC<{
             />
           </div>
         )}
+
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             Số điện thoại
@@ -145,7 +142,10 @@ const PhoneLoginForm: React.FC<{
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2">
-              {isRegister ? "Đăng ký" : "Đăng nhập"} <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+              {isRegister ? "Đăng ký" : "Đăng nhập"}
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </span>
           )}
         </button>
@@ -161,7 +161,7 @@ const PhoneLoginForm: React.FC<{
             {isRegister ? "Đã có tài khoản? Đăng nhập ngay" : "Chưa có tài khoản? Đăng ký ngay"}
           </button>
         </div>
-        
+
         <div className="text-center pt-2">
           <button
             onClick={onSwitchToLogin}

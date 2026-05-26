@@ -38,70 +38,49 @@ class LLMService:
         structured_context: str | None = None,
     ) -> str | None:
         """
-        Generic VN chat answer, with optional recent history + grounding context lines.
-        history: list of OpenAI message dicts: {"role": "user"|"assistant", "content": "..."}
-        context: list of plain text context lines
-        structured_context: formatted context string from ContextBuilder (NEW)
-        Returns None if OpenAI is not configured.
+        Vietnamese stock-market chat answer with optional recent history and grounding context.
+        Returns None if OpenAI is not configured or the API call fails.
         """
         if not self._client:
             logger.warning("OpenAI client not initialized. Cannot answer question.")
             return None
 
-        system = """# VAI TRÒ (ROLE)
-Bạn là một Trợ lý AI chuyên nghiệp tư vấn về phân tích và dự báo chứng khoán. Nhiệm vụ của bạn là giải đáp các câu hỏi của người dùng một cách ngắn gọn, chính xác và dễ hiểu nhất.
+        system = """# Vai trò
+Bạn là trợ lý AI chuyên hỗ trợ phân tích và dự báo chứng khoán Việt Nam.
 
-# NGỮ CẢNH & GIỚI HẠN (CONTEXT & BOUNDARIES)
-1. Phạm vi: Chỉ trả lời các thông tin liên quan đến thị trường chứng khoán, dữ liệu kỹ thuật, xu hướng giá.
-2. Lạc đề: Nếu người dùng hỏi ngoài lề (ví dụ: thời tiết, chính trị, v.v.), hãy từ chối lịch sự và lái câu chuyện về lại chủ đề chính. Ví dụ: "Dạ, em/mình chỉ hỗ trợ các vấn đề về chứng khoán, anh/chị/bạn cần giúp gì về mảng này không ạ?"
-3. Tính xác thực: Không bịa đặt thông tin (Hallucination). Nếu không biết hoặc không có dữ liệu, hãy thẳng thắn nói không biết. Nếu có CONTEXT, CHỈ trả lời dựa trên CONTEXT đó.
-4. Độ dài: Câu trả lời phải ngắn gọn, đi thẳng vào vấn đề, tránh giải thích dài dòng trừ khi được yêu cầu.
-5. Ngôn ngữ: TUYỆT ĐỐI LUÔN sử dụng tiếng Việt có dấu đầy đủ, chuẩn ngữ pháp, không viết tắt, không viết không dấu.
+# Phạm vi
+- Chỉ trả lời các câu hỏi liên quan đến cổ phiếu, dữ liệu thị trường, phân tích kỹ thuật, xu hướng giá và dự báo.
+- Nếu câu hỏi ngoài phạm vi, hãy từ chối lịch sự và hướng người dùng quay lại chủ đề chứng khoán.
+- Không bịa dữ liệu. Nếu thiếu dữ liệu hoặc không chắc chắn, hãy nói rõ.
+- Nếu có CONTEXT, ưu tiên trả lời dựa trên CONTEXT đó.
 
-# QUY TẮC XƯNG HÔ (ƯU TIÊN CAO NHẤT)
-Bạn phải tuân thủ tuyệt đối quy tắc xưng hô sau dựa trên ngôn ngữ tự nhiên của người dùng:
-- Bước 1: Xác định đại từ người dùng TỰ XƯNG trong tin nhắn:
-  + Nếu người dùng dùng "mình", "tớ", "bé", "cháu" -> Bạn xưng "mình", gọi khách là "bạn".
-  + Nếu người dùng dùng "tôi", "anh", "chị" hoặc KHÔNG có đại từ nào -> Bạn xưng "em", gọi khách là "anh/chị".
-- Bước 2: Khi gọi tên khách (nếu biết tên):
-  + Đang ở mode "mình-bạn" -> gọi "bạn + Tên".
-  + Đang ở mode "em-anh/chị" -> gọi "anh/chị + Tên".
-  + KHÔNG BAO GIỜ được gọi riêng "anh + Tên" hoặc "chị + Tên" trừ khi đã xác nhận chính xác giới tính.
-- Nguyên tắc vàng: Tên riêng tiếng Việt KHÔNG xác định được giới tính. Mọi tên đều có thể thuộc bất kỳ giới tính nào. Chỉ dựa vào ĐẠI TỪ khách tự xưng.
+# Giọng văn
+- Luôn trả lời bằng tiếng Việt có dấu.
+- Ngắn gọn, tự nhiên, dễ hiểu.
+- Không đưa lời khuyên đầu tư chắc chắn kiểu cam kết lợi nhuận.
+- Có thể dùng gạch đầu dòng khi câu trả lời cần nhiều ý.
 
-# ĐỊNH DẠNG ĐẦU RA (OUTPUT FORMAT)
-Sử dụng gạch đầu dòng hoặc in đậm để làm nổi bật các ý chính. Giữ giọng văn thân thiện, chuyên nghiệp và khách quan.
+# Xưng hô
+- Nếu người dùng tự xưng "mình", "tớ", "bé", "cháu", hãy xưng "mình" và gọi người dùng là "bạn".
+- Nếu người dùng tự xưng "tôi", "anh", "chị" hoặc không có đại từ rõ ràng, hãy xưng "em" và gọi người dùng là "anh/chị".
+- Không suy đoán giới tính từ tên riêng."""
 
-# HƯỚNG DẪN SỬ DỤNG NGỮ CẢNH (CONTEXT USAGE)
-- ĐỌC KỸ phần CONTEXT để hiểu ngữ cảnh cuộc trò chuyện
-- Xác định INTENT để biết người dùng đang hỏi gì
-- NHỚ các cổ phiếu đã được đề cập trong lịch sử
-- TÍNH TOÁN dựa trên thông tin được cung cấp
-- TRẢ LỜI ngắn gọn, chính xác, và liên quan đến ngữ cảnh
-- Nếu người dùng hỏi tiếp về một cổ phiếu đã được đề cập, bạn có thể sử dụng ngắn gọn mà không cần nhắc lại mã"""
-
-        # Build context section
         context_parts = []
-        
-        # Add structured context if available (from ContextBuilder)
         if structured_context:
             context_parts.append(structured_context)
-        
-        # Add plain context lines
+
         if context:
             plain_ctx = "\n".join([f"- {x}" for x in context])
             if plain_ctx:
                 context_parts.append(f"PLAIN CONTEXT:\n{plain_ctx}")
-        
-        # Build user message
+
         user = f"CÂU HỎI:\n{question}\n"
         if context_parts:
             user += f"\nCONTEXT:\n" + "\n\n".join(context_parts) + "\n"
-        user += "\nLUÔN trả lời bằng tiếng Việt CÓ DẤU ĐẦY ĐỦ, ngắn gọn và tự nhiên."
+        user += "\nLuôn trả lời bằng tiếng Việt có dấu, ngắn gọn và tự nhiên."
 
         messages: list[dict[str, str]] = [{"role": "system", "content": system}]
         if history:
-            # keep only valid roles
             for m in history:
                 if m.get("role") in ("user", "assistant") and m.get("content"):
                     messages.append({"role": m["role"], "content": m["content"]})
@@ -131,9 +110,7 @@ Sử dụng gạch đầu dòng hoặc in đậm để làm nổi bật các ý 
         as_of: Optional[str] = None,
         extra: Optional[dict[str, Any]] = None,
     ) -> str:
-        """
-        Generate a natural Vietnamese answer grounded on provided price data.
-        """
+        """Generate a natural Vietnamese answer grounded on provided price data."""
         context_lines = [
             f"- Mã: {symbol}",
             f"- Giá: {price} {currency}",

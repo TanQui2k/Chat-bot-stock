@@ -1,9 +1,9 @@
 import React from 'react';
 
 const SUGGESTIONS = [
-  { icon: '💰', text: 'Giá FPT hiện tại', action: 'Giá FPT hiện tại là bao nhiêu?' },
-  { icon: '📈', text: 'Phân tích kỹ thuật VNM', action: 'Phân tích kỹ thuật cổ phiếu VNM' },
-  { icon: '📊', text: 'Dự báo xu hướng MSN', action: 'Dự đoán giá MSN trong 24h tới' },
+  { icon: '₫', text: 'Giá FPT hiện tại', action: 'Giá FPT hiện tại là bao nhiêu?' },
+  { icon: 'TA', text: 'Phân tích kỹ thuật VNM', action: 'Phân tích kỹ thuật cổ phiếu VNM' },
+  { icon: 'AI', text: 'Dự báo xu hướng MSN', action: 'Dự đoán giá MSN trong 24h tới' },
 ];
 
 interface ChatWelcomeProps {
@@ -49,7 +49,7 @@ export default function ChatWelcome({ onSuggestionClick }: ChatWelcomeProps) {
               onClick={() => onSuggestionClick(item.action)}
               className="flex items-center justify-center gap-4 p-4 rounded-[1.8rem] bg-card/60 border border-border hover:border-emerald-500/30 hover:bg-muted transition-all text-center group shadow-md cursor-pointer"
             >
-              <span className="text-2xl transition-opacity transform group-hover:scale-110 duration-300 pointer-events-none">
+              <span className="min-w-8 h-8 px-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center justify-center transition-transform group-hover:scale-110 duration-300 pointer-events-none">
                 {item.icon}
               </span>
               <span className="text-muted-foreground group-hover:text-foreground text-sm font-semibold tracking-wide pointer-events-none">
