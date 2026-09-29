@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 
 from src.crud import crud_stock
 from src.api.dependencies import get_db
-from src.models.stock import Ticker
+from src.models.stock import DailyPrice, Ticker
 from src.schemas.stock_schema import PriceResponse, TickerResponse, PredictionResponse
-from src.services.vnstock_service import VnStockPriceService
+from src.services.vnstock_service import StockPrice, VnStockPriceService
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -29,6 +29,35 @@ class StockInfoResponse(BaseModel):
     volume: int | None = None
     market_cap: float | None = None
 
+
+def _get_latest_price_with_database_fallback(symbol: str, db: Session) -> StockPrice:
+    """Prefer the live provider, but keep the API useful if it is unavailable."""
+    normalized_symbol = symbol.upper().strip()
+    try:
+        return VnStockPriceService().get_latest_price(normalized_symbol)
+    except RuntimeError as live_error:
+        stmt = (
+            select(DailyPrice)
+            .join(Ticker, Ticker.id == DailyPrice.ticker_id)
+            .where(
+                Ticker.symbol == normalized_symbol,
+                DailyPrice.close.is_not(None),
+            )
+            .order_by(DailyPrice.date.desc())
+            .limit(1)
+        )
+        stored_price = db.scalar(stmt)
+        if stored_price is None or stored_price.close is None:
+            raise live_error
+
+        return StockPrice(
+            symbol=normalized_symbol,
+            price=float(stored_price.close),
+            as_of=stored_price.date.isoformat(),
+            source="database",
+        )
+
+
 @router.get("/", response_model=List[TickerResponse])
 async def get_all_active_tickers(db: Session = Depends(get_db)):
     stmt = select(Ticker).where(Ticker.is_active == True)
@@ -37,9 +66,9 @@ async def get_all_active_tickers(db: Session = Depends(get_db)):
 
 
 @router.get("/price/{symbol}", response_model=LatestPriceResponse)
-async def get_latest_price(symbol: str):
+async def get_latest_price(symbol: str, db: Session = Depends(get_db)):
     try:
-        price_info = VnStockPriceService().get_latest_price(symbol)
+        price_info = _get_latest_price_with_database_fallback(symbol, db)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except RuntimeError as e:
@@ -56,7 +85,7 @@ async def get_latest_price(symbol: str):
 @router.get("/info/{symbol}", response_model=StockInfoResponse)
 async def get_stock_info(symbol: str, db: Session = Depends(get_db)):
     try:
-        price_info = VnStockPriceService().get_latest_price(symbol)
+        price_info = _get_latest_price_with_database_fallback(symbol, db)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except RuntimeError as e:
