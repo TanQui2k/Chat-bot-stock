@@ -10,7 +10,13 @@ from sqlalchemy.orm import sessionmaker
 from src.core.config import settings
 
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(
+    settings.DATABASE_URL,
+    # Managed databases such as Neon may close idle connections while the
+    # application is scaled down. Validate pooled connections before reuse.
+    pool_pre_ping=True,
+    pool_recycle=300,
+)
 
 
 @event.listens_for(engine, "connect")
