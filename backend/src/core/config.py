@@ -1,8 +1,6 @@
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = BASE_DIR / ".env"
@@ -16,6 +14,7 @@ class Settings(BaseSettings):
     SERVER_PORT: int = 8000
     ENVIRONMENT: str = "development"
     TRUST_PROXY_HEADERS: bool = False
+    AUTO_START_LOCAL_DB: bool = True
 
     # Database
     DATABASE_URL: str = "postgresql+psycopg2://postgres:your_password@localhost:5432/stock_db"
@@ -24,6 +23,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_BASE_URL: str | None = None
+
+    # Market data
+    VNSTOCK_API_KEY: str | None = None
 
     # Security
     SECRET_KEY: str = DEFAULT_SECRET_KEY
@@ -39,20 +41,3 @@ settings = Settings()
 
 if settings.ENVIRONMENT.lower() == "production" and settings.SECRET_KEY == DEFAULT_SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be changed before running in production.")
-
-# SQLAlchemy engine
-engine = create_engine(settings.DATABASE_URL)
-
-
-@event.listens_for(engine, "connect")
-def _set_client_encoding(dbapi_connection, connection_record):  # type: ignore[no-redef]
-    try:
-        cursor = dbapi_connection.cursor()
-        cursor.execute("SET client_encoding TO 'UTF8'")
-        cursor.close()
-    except Exception:
-        # Best effort: do not block app startup if the DB/driver does not support it.
-        pass
-
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

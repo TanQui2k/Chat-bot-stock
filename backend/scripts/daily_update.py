@@ -15,7 +15,12 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
 sys.path.append(backend_dir)
 
-from src.core.config import SessionLocal
+from src.core.config import settings
+
+if settings.VNSTOCK_API_KEY:
+    os.environ.setdefault("VNSTOCK_API_KEY", settings.VNSTOCK_API_KEY)
+
+from src.core.database import SessionLocal
 from src.crud.crud_stock import upsert_daily_prices
 from src.models.stock import DailyPrice, Ticker
 

@@ -1,142 +1,111 @@
-# 🚀 Chat-bot-stock (StockAI Predictor)
+# StockAI Predictor
 
-Một ứng dụng hỗ trợ dự đoán và phân tích chứng khoán sử dụng trí tuệ nhân tạo (AI). Dự án được xây dựng với kiến trúc hiện đại, bao gồm **Backend (FastAPI)** và **Frontend (Next.js)**.
+Ứng dụng phân tích, dự đoán và hỏi đáp về chứng khoán, gồm FastAPI, Next.js và PostgreSQL.
 
-## ✨ Tính năng nổi bật
-
-- 📈 **Phân tích chứng khoán**: Theo dõi và phân tích dữ liệu thị trường.
-- 🤖 **Chat-bot thông minh**: Hỗ trợ giải đáp các câu hỏi về tài chính và chứng khoán.
-- ⚡ **Hiệu năng cao**: Backend viết bằng FastAPI cung cấp phản hồi cực nhanh.
-- 🎨 **Giao diện hiện đại**: Frontend chuẩn React/Next.js mượt mà và trực quan.
-
-## 🏗 Cấu trúc dự án
+## Cấu trúc repository
 
 ```text
 Chat-bot-stock/
-├── backend/          # Nguồn cấp dữ liệu và xử lý AI (FastAPI)
-├── frontend/         # Giao diện người dùng (Next.js/React)
-├── .gitignore        # Cấu hình bỏ qua các tệp không cần thiết
-└── README.md         # Hướng dẫn dự án
+├── backend/
+│   ├── alembic/             # Migration database
+│   ├── scripts/             # Tác vụ nhập/cập nhật dữ liệu
+│   ├── src/
+│   │   ├── api/             # Router và dependency HTTP
+│   │   ├── core/            # Settings, database, security
+│   │   ├── crud/            # Truy cập dữ liệu
+│   │   ├── middleware/      # Middleware FastAPI
+│   │   ├── ml/              # Prophet và anomaly detection
+│   │   ├── models/          # SQLAlchemy models
+│   │   ├── schemas/         # Pydantic schemas
+│   │   └── services/        # Nghiệp vụ và tích hợp bên ngoài
+│   └── tests/
+├── frontend/
+│   └── src/
+│       ├── app/             # Next.js App Router
+│       ├── components/      # UI components
+│       ├── context/         # React contexts
+│       ├── lib/             # API client và cấu hình
+│       └── services/        # Nghiệp vụ phía client
+├── scripts/                 # Lệnh quản trị toàn repository
+├── docs/                    # Tài liệu kiến trúc và phát triển
+└── setup_project.bat        # Lối tắt setup trên Windows
 ```
 
----
+## Yêu cầu
 
-## 🛠 Yêu cầu hệ thống (Prerequisites)
+- Python 3.10+
+- Node.js 20+
+- PostgreSQL 17
+- PowerShell 5.1+
 
-Đảm bảo máy của bạn đã cài:
+Môi trường local của dự án dùng PostgreSQL tại `127.0.0.1:5433`, database `stock_db`, user `postgres`, không đặt password.
 
-- **Python 3.10+** (Backend)
-- **Node.js 18+** & **npm/yarn/pnpm** (Frontend)
-- **PostgreSQL** (Cơ sở dữ liệu)
+## Cài đặt
 
----
+Từ thư mục gốc repository:
 
-## ⚙️ Hướng dẫn cài đặt
+```powershell
+.\scripts\setup.ps1
+```
 
-### 1. Thiết lập Database
+Script sẽ tạo `backend/.venv`, cài dependency backend/frontend, tạo file môi trường còn thiếu, khởi động PostgreSQL local và chạy migration.
 
-1. Cài đặt và chạy dịch vụ **PostgreSQL**.
-2. Tạo một database mới tên: `stock_db`.
+Nếu chỉ muốn cài dependency, không khởi động database:
 
-### 2. Thiết lập Backend (FastAPI)
+```powershell
+.\scripts\setup.ps1 -SkipDatabase
+```
 
-1. **Di chuyển vào thư mục backend**:
+## Chạy development
 
-   ```bash
-   cd backend
-   ```
+Mở hai terminal.
 
-2. **Tạo môi trường ảo & Cài đặt thư viện**:
+Terminal backend:
 
-   ```bash
-   python -m venv .venv
-   # Active trên Windows:
-   .venv\Scripts\activate
-   # Active trên Linux/MacOS:
-   source .venv/bin/activate
-
-   pip install -r requirements.txt
-   ```
-
-   Nếu bạn đã tạo môi trường từ trước, nên chạy lại lệnh trên để đồng bộ đúng bộ version đã được pin cho runtime và test.
-
-3. **Cấu hình môi trường**:
-
-   - Tạo file `.env` trong thư mục `backend/`.
-   - Cập nhật chuỗi kết nối PostgreSQL:
-
-     ```env
-     DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/stock_db
-     ```
-
-4. **Khởi tạo Database (Migrations)**:
-
-   ```bash
-   alembic upgrade head
-   ```
-
-5. **Chạy Server**:
-
-   ```bash
-   uvicorn src.main:app --reload
-   ```
-
-   > 🔗 Truy cập: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
-
-6. **Chạy smoke test backend**:
-
-   ```bash
-   python -m unittest discover -s tests -p "test_*.py"
-   ```
-
-### 3. Thiết lập Frontend (Next.js)
-
-1. **Di chuyển vào thư mục frontend**:
-
-   ```bash
-   cd frontend
-   ```
-
-2. **Cài đặt & Chạy Development**:
-
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-   > 🔗 Truy cập: [http://localhost:3000](http://localhost:3000)
-
----
-
-## 🚀 Quy trình sử dụng
-
-1. Đảm bảo cả hai máy chủ (Backend & Frontend) đang chạy đồng thời.
-2. Truy cập cổng `3000` trên trình duyệt để bắt đầu trải nghiệm.
-
-## 📊 Bảo trì dữ liệu (Data Maintenance)
-
-Để hệ thống luôn có dữ liệu mới nhất, bạn nên chạy script cập nhật hàng ngày (sau giờ giao dịch, khoảng 15:00 - 16:00):
-
-### 1. Chạy cập nhật thủ công:
-```bash
+```powershell
 cd backend
-python scripts/daily_update.py
+.\run_server.ps1
 ```
 
-### 2. Tự động hóa (Windows):
-Bạn có thể tạo một file `.bat` và dùng **Task Scheduler** để chạy mỗi ngày:
+Terminal frontend:
 
-`update_stock.bat`:
-```batch
-@echo off
-cd /d D:\Chat-bot-stock\backend
-call .venv\Scripts\activate
-python scripts/daily_update.py
-pause
+```powershell
+cd frontend
+npm run dev
 ```
 
----
+Các địa chỉ chính:
 
-## 📄 Giấy phép
+- Giao diện: http://localhost:3000
+- API: http://127.0.0.1:8000
+- Swagger: http://127.0.0.1:8000/docs
 
-Dự án được phát triển cho mục đích học tập và nghiên cứu.
+## Kiểm tra chất lượng
+
+Chạy toàn bộ dependency check, backend tests, frontend lint và production build:
+
+```powershell
+.\scripts\check.ps1
+```
+
+Để bỏ qua production build trong vòng lặp phát triển nhanh:
+
+```powershell
+.\scripts\check.ps1 -SkipBuild
+```
+
+## Cập nhật dữ liệu chứng khoán
+
+```powershell
+.\scripts\update-data.ps1
+```
+
+Tool sẽ tiếp tục từ ngày cuối đang lưu của từng mã và upsert theo khóa `(ticker_id, date)`, vì vậy có thể chạy lại mà không tạo bản ghi trùng.
+
+## Cấu hình
+
+- Backend: sao chép `backend/.env.example` thành `backend/.env`.
+- Frontend: sao chép `frontend/.env.example` thành `frontend/.env.local`.
+- Không commit `.env`, API key, database local, logs, `.venv`, `node_modules` hoặc `.next`.
+
+Xem thêm tài liệu trong [`docs/index.md`](docs/index.md).

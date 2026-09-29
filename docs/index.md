@@ -28,6 +28,7 @@
 - [Source Tree Analysis](./source-tree-analysis.md)
 - [Component Inventory - Frontend](./ui-component-inventory-frontend.md)
 - [Development Guide](./development-guide.md)
+- [Maintenance Structure](./maintenance-structure.md)
 - [API Contracts - Backend](./api-contracts-backend.md)
 - [Data Models - Backend](./data-models-backend.md)
 - [Integration Architecture](./integration-architecture.md)
@@ -36,7 +37,7 @@
 ### Existing Documentation
 
 - [README (Root)](../README.md) - Hướng dẫn dự án chung
-- [REFACTORING_SUMMARY](../REFACTORING_SUMMARY.md) - Tóm tắt thay đổi code backend
+- [Refactoring Summary](./refactoring_summary.md) - Tóm tắt thay đổi code backend
 - [README (Frontend)](../frontend/README.md) - Tài liệu Next.js cơ sở
 - [RUN_SERVER (Backend)](../backend/RUN_SERVER.md) - Hướng dẫn chạy Backend Server
 

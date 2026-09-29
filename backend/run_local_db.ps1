@@ -18,6 +18,7 @@ $pgIsReady = Join-Path $pgBin "pg_isready.exe"
 $psql = Join-Path $pgBin "psql.exe"
 $createdb = Join-Path $pgBin "createdb.exe"
 $pgRestore = Join-Path $pgBin "pg_restore.exe"
+$pythonExe = Join-Path $scriptPath ".venv\Scripts\python.exe"
 
 New-Item -ItemType Directory -Force -Path $baseDir | Out-Null
 
@@ -32,12 +33,46 @@ if (-not (Test-Path $dataDir)) {
 & $pgIsReady -h 127.0.0.1 -p 5433 -U postgres -d postgres | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Starting local PostgreSQL on 127.0.0.1:5433..." -ForegroundColor Yellow
-    & $pgCtl -D $dataDir -l $logFile -o '"-p 5433 -h 127.0.0.1"' start | Out-Null
-    $pgCtlExitCode = $LASTEXITCODE
-    Start-Sleep -Seconds 4
-    & $pgIsReady -h 127.0.0.1 -p 5433 -U postgres -d postgres | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "pg_ctl start failed with exit code $pgCtlExitCode and PostgreSQL is still not ready on port 5433."
+    # Give pg_ctl its own hidden process group. This keeps PostgreSQL alive
+    # after a setup script or parent development process closes its console.
+    $pgCtlArgs = @(
+        "start",
+        "-D", "`"$dataDir`"",
+        "-l", "`"$logFile`"",
+        "-o", "`"-p 5433 -h 127.0.0.1`"",
+        "-W"
+    )
+    $pgCtlProcess = Start-Process `
+        -FilePath $pgCtl `
+        -ArgumentList $pgCtlArgs `
+        -WindowStyle Hidden `
+        -PassThru
+
+    $databaseReady = $false
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        & $pgIsReady -h 127.0.0.1 -p 5433 -U postgres -d postgres | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $databaseReady = $true
+            break
+        }
+
+        $pgCtlProcess.Refresh()
+        if ($pgCtlProcess.HasExited -and $pgCtlProcess.ExitCode -ne 0) {
+            throw "pg_ctl start failed with exit code $($pgCtlProcess.ExitCode)."
+        }
+
+        Start-Sleep -Seconds 1
+    }
+
+    # Some Windows terminals keep pg_ctl waiting even after postgres is ready.
+    # The server is already detached, so the controller can safely be closed.
+    $pgCtlProcess.Refresh()
+    if (-not $pgCtlProcess.HasExited) {
+        Stop-Process -Id $pgCtlProcess.Id -Force
+    }
+
+    if (-not $databaseReady) {
+        throw "PostgreSQL is still not ready on port 5433 after 60 seconds."
     }
 }
 
@@ -60,7 +95,11 @@ if ($dbExists.Trim() -ne "1") {
 
     Push-Location $scriptPath
     try {
-        alembic upgrade head
+        if (Test-Path $pythonExe) {
+            & $pythonExe -m alembic upgrade head
+        } else {
+            alembic upgrade head
+        }
         if ($LASTEXITCODE -ne 0) {
             throw "alembic upgrade head failed with exit code $LASTEXITCODE."
         }

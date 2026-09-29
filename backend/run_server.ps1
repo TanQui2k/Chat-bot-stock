@@ -11,10 +11,6 @@ if (-not (Test-Path $pythonExe)) {
     $pythonExe = "python"
 }
 
-Write-Host "Ensuring local PostgreSQL is running..." -ForegroundColor Green
-& (Join-Path $scriptPath "run_local_db.ps1")
-Write-Host ""
-
 Write-Host "Starting FastAPI server..." -ForegroundColor Green
 Write-Host ""
 

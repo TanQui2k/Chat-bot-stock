@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
-from src.api.routes import anomaly, assistant, auth, chat, predict, stocks
+from src.api.router import api_router
 from src.middleware.rate_limiter import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
@@ -61,15 +61,7 @@ async def operational_error_handler(request: Request, exc: OperationalError):
     )
 
 
-# ==========================================
-# Routes
-# ==========================================
-app.include_router(stocks.router, prefix="/api")
-app.include_router(predict.router, prefix="/api/predict", tags=["Prediction"])
-app.include_router(chat.router, prefix="/api")
-app.include_router(assistant.router, prefix="/api")
-app.include_router(auth.router, prefix="/api")
-app.include_router(anomaly.router, prefix="/api", tags=["Anomaly Detection"])
+app.include_router(api_router, prefix="/api")
 
 
 @app.get("/")
